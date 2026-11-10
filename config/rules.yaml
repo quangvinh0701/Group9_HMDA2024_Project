@@ -1,0 +1,631 @@
+# =============================================================================
+# rules.yaml - Quy tắc chung cho project HMDA 2024, Nhóm 9, Big Data Analysis
+#
+# PHIÊN BẢN 1.1 - ĐÓNG BĂNG ngày 07/11/2026
+#
+# File này chỉ chứa QUYẾT ĐỊNH: mã, bộ lọc, điểm cắt, định nghĩa, công thức, ngưỡng.
+# Các con số dùng để kiểm tra (số dòng, số lender, số ô...) nằm ở expected.yaml.
+#
+# Quy trình thay đổi:
+#   - Không ai sửa file này trực tiếp. Ai thấy vấn đề thì ghi vào danh sách chung.
+#   - Vinh duyệt mỗi tuần một lần, gom thành một bản mới (1.1, 1.2...) và ghi vào CHANGELOG.
+#   - Mỗi pipeline in giá trị `version` của file này vào mọi file kết quả.
+#   - expected.yaml được cập nhật bất cứ lúc nào, không cần đổi phiên bản file này.
+#   - Không sửa quy tắc để khớp số cũ của proposal; số lệch thì sửa báo cáo.
+#
+# CHANGELOG
+# 10/11/2026: chỉ sửa lời chú thích trong CHANGELOG, không đổi quy tắc nào; nội dung YAML giống hệt bản 1.1
+#   đã chạy trên Kaggle ngày 07/11/2026.
+# 1.1 (07/11/2026):
+#   - DTI quay lại 6 nhóm như proposal (90 ô rủi ro).
+#     Mốc 43 ở đây không dựa vào quy định QM mà chia 14 giá trị DTI được báo chính xác (36-49) thành hai nửa
+#     7 giá trị, cỡ mẫu tương đương. Cách gộp 5 nhóm (36-49) giữ lại làm kiểm tra độ nhạy (bands_sensitivity).
+#   - Theo nhận xét của thầy cho các nhóm (07/11/2026):
+#     + Thí nghiệm hiệu năng (nhận xét cho nhóm 9): bản nhân chỉ dùng cho benchmark; mỗi lần chạy trong tiến trình
+#       con, ghi RAM cao nhất và điểm Pandas hết bộ nhớ (mục 18).
+#     + Kiểm định bước nhảy DTI có khoảng tin cậy và mốc giả, đo mức dồn cục ở 49 (mục 21, cho H2).
+#     + Chẩn đoán nhóm DTI dưới 20% (mục 22).
+#     + Profiling đủ 99 trường (mục 16).
+#   - Chốt ba điểm treo từ bản 1.0: độ phân tán rate spread giữa lender và MSA (mục 23), ngưỡng độ phủ 50% để
+#     diễn giải Kitagawa (mục 11), bảng giá báo median và IQR bên cạnh mean (mục 4).
+# 1.0 (01/11/2026), so với các bản nháp trước:
+#   - Tách số kỳ vọng sang expected.yaml.
+#   - DTI: 5 nhóm, gộp 36-49; ô rủi ro còn 5 x 5 x 3 = 75.
+#   - Phạm vi địa lý: mọi so sánh giữa các vùng chỉ gồm 50 bang + DC; PR báo riêng;
+#     GU, VI chỉ đếm; hồ sơ thiếu vị trí báo riêng.
+#   - Split-half chia bằng hash tất định (đề xuất của Công), không dùng seed ngẫu nhiên.
+#   - Chốt thứ tự lọc của mô hình hai chiều, trọng số SD, tập MSA chung, HHI.
+#   - Thêm khoảng hợp lệ cho rate_spread, interest_rate, loan_term, total_loan_costs.
+#   - Chốt công thức O/E, funnel, tau, Kitagawa, lý do từ chối, độ nhạy định nghĩa từ chối.
+#   - Định nghĩa chính xác 6 đầu ra của kiểm tra tương đương (thêm rate_spread).
+#   - Dự đoán: chia fold theo hash của lei (5 fold, cross-fitting), thêm tiêu chí calibration.
+# =============================================================================
+
+version: "1.1"
+
+# -----------------------------------------------------------------------------
+# 1. Nguồn dữ liệu
+# -----------------------------------------------------------------------------
+source:
+  dataset: "HMDA 2024 One-Year National LAR (static, frozen 2 June 2026)"
+  raw_csv: "2024_public_lar_one_year_csv.csv"      # 99 cột
+  raw_parquet: "hmda_2024_raw.parquet"             # tạo bằng convert_to_parquet.py
+  # Parquet thô: mọi cột là string, chuỗi "NA" giữ nguyên (không thành null),
+  # thêm cột row_id (int64, đánh số từ 0 theo thứ tự dòng trong CSV).
+  row_id_column: row_id
+  partition_clean_by: state_code
+  # Tên cột dùng đúng như trong file (gạch dưới): open_end_line_of_credit,
+  # derived_msa_md, denial_reason_1 ... denial_reason_4.
+  transmittal_sheet:                # file TS cùng bộ HMDA 2024, ghép theo lei
+    url: "https://files.ffiec.cfpb.gov/static-data/one-year/2024/2024_public_ts_one_year_csv.zip"
+    join_key: lei
+    columns: [lei, respondent_name, agency_code, lar_count]
+    join_type: left
+    spark_broadcast: true
+
+# -----------------------------------------------------------------------------
+# 2. Mã đặc biệt
+#    Không bao giờ đổi thành 0. Khi chuyển sang số, các mã này thành null và
+#    được đếm riêng theo loại.
+# -----------------------------------------------------------------------------
+special_codes:
+  not_applicable: ["NA"]
+  exempt_text: ["Exempt"]           # trường số của tổ chức được miễn một phần
+  exempt_enum: ["1111"]             # trường dạng mã của tổ chức được miễn một phần
+  age_not_available: ["8888"]       # chỉ có nghĩa ở applicant_age / co_applicant_age
+  age_no_coapplicant: ["9999"]      # chỉ có nghĩa ở co_applicant_age
+  empty: [""]
+  msa_nonmetro: "99999"             # derived_msa_md ngoài vùng đô thị
+  # Riêng income: 1111 / 8888 / 9999 là SỐ THU NHẬP THẬT (nghìn USD), không phải mã.
+  # Income chỉ có mã đặc biệt "NA". Xem mục 6.
+
+# -----------------------------------------------------------------------------
+# 3. Bảng mã
+# -----------------------------------------------------------------------------
+codes:
+  action_taken:
+    "1": originated
+    "2": approved_not_accepted
+    "3": denied
+    "4": withdrawn
+    "5": incomplete
+    "6": purchased                  # loại
+    "7": preapproval_denied         # loại
+    "8": preapproval_approved_not_accepted   # loại
+  loan_type: {"1": conventional, "2": FHA, "3": VA, "4": USDA}
+  loan_purpose:
+    "1": purchase
+    "2": home_improvement
+    "31": refinance
+    "32": cash_out_refinance
+    "4": other
+    "5": not_applicable
+  occupancy_type: {"1": principal_residence, "2": second_residence, "3": investment}
+  lien_status: {"1": first_lien, "2": subordinate_lien}
+  denial_reason:                    # denial_reason_1 .. denial_reason_4
+    "1": debt_to_income
+    "2": employment_history
+    "3": credit_history
+    "4": collateral
+    "5": insufficient_cash
+    "6": unverifiable_information
+    "7": application_incomplete
+    "8": mortgage_insurance_denied
+    "9": other
+    "10": not_applicable
+  agency_code: {"1": OCC, "2": FRS, "3": FDIC, "5": NCUA, "7": HUD, "9": CFPB}
+
+# -----------------------------------------------------------------------------
+# 4. Mẫu nghiên cứu
+# -----------------------------------------------------------------------------
+samples:
+  # Áp dụng ĐÚNG thứ tự này; in số dòng sau từng bước.
+  core_filters:
+    - {step: applications,        column: action_taken,                   in: ["1", "2", "3", "4", "5"]}
+    - {step: first_lien,          column: lien_status,                    equals: "1"}
+    - {step: closed_end,          column: open_end_line_of_credit,        equals: "2"}
+    - {step: non_business,        column: business_or_commercial_purpose, equals: "2"}
+    - {step: non_reverse,         column: reverse_mortgage,               equals: "2"}
+    - {step: site_built_1_4_unit, column: derived_dwelling_category,      equals: "Single Family (1-4 Units):Site-Built"}
+    - {step: principal_residence, column: occupancy_type,                 equals: "1"}
+  # Ở bước closed_end, hồ sơ có mã 1111 bị loại; phân tích độ nhạy thêm lại nhóm này.
+  sensitivity_readd_open_end_exempt: true
+
+  decisioned:                       # mẫu tính tỷ lệ từ chối = core + action_taken 1-3
+    action_taken_in: ["1", "2", "3"]
+
+  usable:                           # mẫu chuẩn hóa rủi ro = decisioned + 3 điều kiện
+    dti_ordinal_not_null: true
+    cltv_range: {gt: 0, le: 250}
+    income_gt: 0
+
+  pricing:                          # mẫu phân tích giá = core + action_taken 1
+    action_taken_in: ["1"]
+    value_column: rate_spread
+    require_valid: rate_spread      # theo khoảng hợp lệ ở mục 6
+    compare_within: loan_type       # APR của FHA có phí bảo hiểm trả trước
+    describe: [n, mean, median, p25, p75, sd]   # bảng giá luôn có median và IQR bên cạnh mean
+    raw_values_kept: "giá trị ngoài khoảng hợp lệ vẫn nằm trong Parquet thô; cột phân tích để null"
+
+# -----------------------------------------------------------------------------
+# 5. Tỷ lệ từ chối
+# -----------------------------------------------------------------------------
+denial_rate:
+  main:        {numerator: ["3"], denominator: ["1", "2", "3"]}
+  alternative: {numerator: ["3"], denominator: ["1", "2", "3", "4", "5"]}   # độ nhạy
+
+# -----------------------------------------------------------------------------
+# 6. Biến số
+# -----------------------------------------------------------------------------
+variables:
+
+  debt_to_income_ratio:
+    normalize: {remove: ["%", " "]}
+    ordinal_map:                    # thang thứ bậc 19 mức
+      "<20": 1
+      "20-<30": 2
+      "30-<36": 3
+      "36": 4
+      "37": 5
+      "38": 6
+      "39": 7
+      "40": 8
+      "41": 9
+      "42": 10
+      "43": 11
+      "44": 12
+      "45": 13
+      "46": 14
+      "47": 15
+      "48": 16
+      "49": 17
+      "50-60": 18
+      ">60": 19
+    # Không có trong bảng (NA, Exempt, trống) -> null. Không gán điểm giữa khoảng.
+    # Phân tích DTI-từ chối (H2) dùng thang 19 mức. Ô rủi ro dùng 5 nhóm dưới đây.
+    # Khoảng (lo, hi] trên thang thứ bậc.
+    bands:                          # 6 nhóm, dùng cho ô rủi ro chính
+      - {label: "<30",    lo: 0,  hi: 2}
+      - {label: "30-<36", lo: 2,  hi: 3}
+      - {label: "36-42",  lo: 3,  hi: 10}
+      - {label: "43-49",  lo: 10, hi: 17}
+      - {label: "50-60",  lo: 17, hi: 18}
+      - {label: ">60",    lo: 18, hi: 19}
+    bands_sensitivity:              # 5 nhóm, chỉ để kiểm tra độ nhạy
+      - {label: "<30",    lo: 0,  hi: 2}
+      - {label: "30-<36", lo: 2,  hi: 3}
+      - {label: "36-49",  lo: 3,  hi: 17}
+      - {label: "50-60",  lo: 17, hi: 18}
+      - {label: ">60",    lo: 18, hi: 19}
+
+  combined_loan_to_value_ratio:
+    numeric: true
+    valid_range: {gt: 0, le: 250}
+    # Khoảng (lo, hi]: cltv <= 80, 80 < cltv <= 90, ...
+    bands:
+      - {label: "<=80",   lo: 0,   hi: 80}
+      - {label: "80-90",  lo: 80,  hi: 90}
+      - {label: "90-95",  lo: 90,  hi: 95}
+      - {label: "95-100", lo: 95,  hi: 100}
+      - {label: ">100",   lo: 100, hi: .inf}
+
+  income:
+    numeric: true
+    unit: thousand_usd
+    special_values: ["NA"]          # mã đặc biệt duy nhất; 1111/8888/9999 giữ là số
+    flag_non_positive: true         # gắn cờ, loại khỏi usable
+    flag_above: 10000               # > 10 triệu USD: gắn cờ, KHÔNG loại
+
+  loan_amount:
+    numeric: true
+    unit: usd
+
+  loan_to_income:
+    formula: "loan_amount / (1000 * income)"
+    requires: {income_gt: 0}
+    # Điểm cắt tam phân vị cố định, tính một lần bằng Pandas (quantile, nội suy linear)
+    # trên mẫu usable. Không tính lại trong pipeline.
+    cut_exact:
+      q1: 2.3550724637681157
+      q2: 3.4036144578313254
+    cut_reported: [2.36, 3.40]      # chỉ để trình bày
+    # Khoảng (lo, hi]: T1 = lti <= q1; T2 = q1 < lti <= q2; T3 = lti > q2.
+    bands:
+      - {label: "T1", lo: -.inf, hi: q1}
+      - {label: "T2", lo: q1,    hi: q2}
+      - {label: "T3", lo: q2,    hi: .inf}
+
+  lmi_tract:
+    column: tract_to_msa_income_percentage
+    zero_means_missing: true
+    lmi_if_below: 80                # LMI = tỷ lệ < 80
+
+  jumbo:
+    column: conforming_loan_limit
+    values: {"C": 0, "NC": 1, "U": null, "NA": null}
+    interpret_within_loan_type: ["1"]   # chỉ diễn giải jumbo trong conventional
+
+  broker:
+    # Proxy kênh môi giới. 1 nộp thẳng, 2 không nộp thẳng, 3 NA, 1111 Exempt.
+    column: submission_of_application
+    values: {"1": 0, "2": 1, "3": null, "1111": null}
+    # Biến 3 kênh, chỉ dùng cho độ nhạy:
+    #   retail      : submission = 1 và payable = 1
+    #   broker      : submission = 2 và payable = 1
+    #   third_party : payable = 2
+    #   null        : có 3 hoặc 1111 ở một trong hai cột
+    channel3_column: initially_payable_to_institution
+
+  rate_spread:
+    numeric: true                   # NA, Exempt -> null, đếm riêng
+    valid_range: {ge: -8, le: 15}   # điểm phần trăm
+    # Ngoài khoảng -> null, đếm riêng là "implausible". Khoảng cố định (không dùng
+    # percentile) để Pandas và Spark cắt giống hệt nhau.
+    #   Cận dưới -8: khoản vay lãi suất 0% (ví dụ chương trình nhà ở từ thiện) có spread
+    #   khoảng -7 khi APOR khoảng 7%; thấp hơn nữa là không thể.
+    #   Cận trên 15: APR khoảng 22%, vượt mọi mức hợp lý cho vay thế chấp nhà ở hạng nhất.
+    # Điều kiện dừng: nếu hơn 0.01% giá trị dạng số nằm ngoài khoảng thì báo Vinh trước khi dùng.
+
+  interest_rate:
+    numeric: true
+    valid_range: {ge: 0, le: 20}    # phần trăm/năm; 0 hợp lệ (khoản vay 0%)
+
+  loan_term:
+    numeric: true
+    valid_range: {gt: 0, le: 480}   # tháng
+
+  total_loan_costs:
+    numeric: true
+    valid_range: {ge: 0}
+
+  cost_share:
+    formula: "total_loan_costs / loan_amount"
+    sample: pricing
+    requires: {total_loan_costs_valid: true, loan_amount_gt: 0}
+
+  payment_to_income:
+    # r = interest_rate / 1200, n = loan_term
+    # Khoản trả tháng P = loan_amount * r / (1 - (1 + r)^(-n)); nếu r = 0 thì P = loan_amount / n
+    formula: "P / (1000 * income / 12)"
+    sample: pricing
+    requires: {interest_rate_valid: true, loan_term_valid: true, income_gt: 0}
+
+# -----------------------------------------------------------------------------
+# 7. Ô rủi ro và giá trị kỳ vọng
+# -----------------------------------------------------------------------------
+risk_cells:
+  keys: [dti_band, cltv_band, lti_band]      # 6 x 5 x 3 = 90 ô
+  sensitivity_dti_bands: bands_sensitivity   # tính lại với 5 nhóm DTI (75 ô): O/E quốc gia, tau lender,
+                                             # Kitagawa FHA vs conventional, Spearman thứ hạng lender
+  sample: usable
+
+extended_cells:
+  keys: [dti_band, cltv_band, lti_band, loan_type, loan_purpose]
+  min_n: 30
+  fallback: risk_cells                       # ô < 30 hồ sơ dùng tỷ lệ của ô rủi ro
+  # p_ext = tỷ lệ từ chối quốc gia của ô (tính trên TOÀN BỘ mẫu usable, mọi vùng, mọi lender).
+  # Hệ quả: tổng O = tổng E đúng trong các ô >= 30; nhóm fallback làm tổng O/E quốc gia
+  # lệch nhẹ khỏi 1. Không hiệu chỉnh; báo cáo tổng O/E quốc gia như một chẩn đoán.
+  robustness_exclude_fallback: true          # tính lại O/E lender khi bỏ hồ sơ fallback,
+                                             # báo |thay đổi| lớn nhất và Spearman
+
+# -----------------------------------------------------------------------------
+# 8. Phạm vi địa lý
+# -----------------------------------------------------------------------------
+geography:
+  # Mọi so sánh GIỮA CÁC VÙNG (bang, MSA, county, khu LMI, mô hình hai chiều, HHI)
+  # chỉ dùng hồ sơ có state_code thuộc danh sách dưới đây.
+  universe_states: [AL, AK, AZ, AR, CA, CO, CT, DE, DC, FL, GA, HI, ID, IL, IN, IA, KS, KY,
+                    LA, ME, MD, MA, MI, MN, MS, MO, MT, NE, NV, NH, NJ, NM, NY, NC, ND, OH,
+                    OK, OR, PA, RI, SC, SD, TN, TX, UT, VT, VA, WA, WV, WI, WY]
+  report_separately: [PR]           # một dòng riêng: n, tỷ lệ từ chối, O/E
+  count_only: [GU, VI]              # chỉ đếm trong bảng chất lượng dữ liệu
+  missing_values: ["NA", ""]        # state, county, tract thiếu -> báo riêng, không xếp hạng
+  # Phạm vi này KHÔNG áp dụng cho: mẫu core, p_ext, O/E theo lender, Kitagawa,
+  # mô hình dự đoán, workload hiệu năng và kiểm tra tương đương (đều dùng toàn bộ dữ liệu).
+  state_min_n: 1000                 # hồ sơ usable; chỉ là chốt an toàn
+  county_code_format: "^[0-9]{5}$"  # mã không khớp -> coi như thiếu
+  county_display_min_n: 1000        # chỉ khi vẽ hoặc xếp hạng county
+  msa_exclude_nonmetro: true        # bỏ 99999
+
+# -----------------------------------------------------------------------------
+# 9. Ngưỡng nhóm
+# -----------------------------------------------------------------------------
+thresholds:
+  lender:                           # tính trên toàn quốc, không giới hạn phạm vi địa lý
+    min_decisioned: 500
+    min_usable_share: 0.80
+  msa:
+    # Tập MSA chung: MSA trong phạm vi địa lý, khác 99999, có >= 1,000 hồ sơ usable
+    # tính trên MỌI lender. Dùng chung cho O/E theo MSA, HHI và mô hình hai chiều.
+    min_usable: 1000
+  cell:
+    min_n: 30
+  sensitivity:
+    cell_min_n: [20, 30, 50]
+    lender_min_decisioned: [250, 500, 1000]
+    lender_min_usable_share: [0.70, 0.80, 0.90]
+
+# -----------------------------------------------------------------------------
+# 10. O/E, funnel, tau
+# -----------------------------------------------------------------------------
+observed_expected:
+  sample: usable
+  per_group:
+    O: "tổng denied"
+    E: "tổng p_ext"
+    V: "tổng p_ext * (1 - p_ext)"
+    oe: "O / E"
+    sampling_var: "V / E^2"
+  groups:
+    lender: "767 lender đạt ngưỡng; mọi hồ sơ usable của lender, mọi vùng"
+    state: "phạm vi địa lý, state_min_n"
+    msa: "tập MSA chung"
+    lmi: "phạm vi địa lý, tract ratio hợp lệ; LMI so với không LMI"
+  funnel:
+    target: 1
+    x_axis: E
+    limits: "1 +/- z * sqrt(V) / E"
+    z: [1.96, 3.09]                 # 95% và 99.8%
+    report: share_outside_each_limit
+  tau:
+    formula: "tau^2 = Var(oe) - mean(sampling_var); tau = sqrt(max(tau^2, 0))"
+    variance: unweighted_ddof1      # Pandas .var() mặc định, Spark var_samp
+  within_loan_type:
+    types: ["1", "2"]               # conventional, FHA
+    lender_rule: ">= 500 hồ sơ usable thuộc loại vay đó (không xét điều kiện 80%)"
+  extremes_table:
+    n_each_side: 10                 # 10 O/E thấp nhất và 10 cao nhất trong 767 lender
+    columns: [lei, respondent_name, n_usable, O, E, oe, dominant_loan_type, dominant_loan_type_share,
+              dominant_purpose, dominant_purpose_share, withdrawn_incomplete_share,
+              denial_rate_main, denial_rate_alternative]
+    note: "Mô tả, không dùng tên lender làm bằng chứng"
+
+# -----------------------------------------------------------------------------
+# 11. Phân rã Kitagawa
+# -----------------------------------------------------------------------------
+kitagawa:
+  sample: usable                    # toàn quốc
+  cells: risk_cells
+  pairs:
+    - {label: "FHA vs conventional",  column: loan_type,    a: "2",  b: "1"}
+    - {label: "cash-out vs purchase", column: loan_purpose, a: "32", b: "1"}
+    - {label: "refinance vs purchase", column: loan_purpose, a: "31", b: "1"}
+  common_support: "ô có >= 30 hồ sơ ở CẢ hai nhóm; tỷ trọng s tính lại trong các ô này"
+  outputs: [gap, composition, rate, rate_gap_at_a_mix, rate_gap_at_b_mix,
+            n_common_cells, coverage_a, coverage_b, min_cell_n_a, min_cell_n_b,
+            within_cell_gap_min, within_cell_gap_max, cells_a_higher, cells_a_lower]
+  # composition = sum (sA - sB)(rA + rB)/2 ; rate = sum (rA - rB)(sA + sB)/2
+  # rate_gap_at_a_mix = sum sA (rA - rB) ; rate_gap_at_b_mix = sum sB (rA - rB)
+  # Nếu hai rate_gap đổi dấu: không báo một tỷ lệ "giải thích được", báo kiểu tương tác.
+  interpret_only_if_coverage_ge: 0.5   # độ phủ của một nhóm dưới 50%: chỉ mô tả, không diễn giải hai phần
+  pricing_version: "giống hệt, r = trung bình rate_spread, mẫu pricing, trong từng loại vay"
+
+# -----------------------------------------------------------------------------
+# 12. Lý do từ chối
+# -----------------------------------------------------------------------------
+denial_reasons:
+  sample: "hồ sơ denied trong mẫu usable"
+  cites: "hồ sơ nêu lý do k nếu BẤT KỲ cột denial_reason_1..4 bằng k"
+  exclude_codes: ["10"]
+  by: [loan_type, loan_purpose]
+
+# -----------------------------------------------------------------------------
+# 13. Mô hình hai chiều lender + MSA
+# -----------------------------------------------------------------------------
+two_way_effects:
+  sample_steps:                     # đúng thứ tự
+    - "mẫu usable"
+    - "state_code thuộc phạm vi địa lý"
+    - "derived_msa_md khác 99999 và thuộc tập MSA chung (mục 9)"
+    - "lei thuộc 767 lender đạt ngưỡng"
+    - "giữ thành phần liên thông lớn nhất của đồ thị lender - MSA"
+  outcome: "r = denied - p_ext"
+  method: alternating_means
+  start: "a = 0, b = 0"
+  iterations: 40                    # cố định, không dừng theo sai số
+  update_order: "a = mean theo lender của (r - b); rồi b = mean theo MSA của (r - a)"
+  split_half:
+    within: [lei, derived_msa_md]
+    hash: "h = ((row_id + 2024) * 2654435761) mod 4294967296"
+    rule: "trong từng ô lender x MSA, sắp theo (h, row_id) tăng dần; thứ hạng bắt đầu từ 1; half = (thứ hạng - 1) mod 2"
+    # Spark: row_number() trên Window.partitionBy(lei, msa).orderBy(h, row_id)
+    # Pandas: sort_values([lei, msa, h, row_id]) rồi groupby([lei, msa]).cumcount() % 2
+    fit_each_half: "chạy lại 40 vòng trên từng nửa, không lọc lại liên thông"
+  weights: "số hồ sơ của nhóm trong mẫu liên thông (toàn mẫu)"
+  full_sample_sd: "sqrt(phương sai có trọng số của hiệu ứng ước lượng trên toàn mẫu)"
+  split_half_signal_sd: "sqrt(max(hiệp phương sai có trọng số giữa hiệu ứng nửa 0 và nửa 1, 0))"
+  split_half_groups: "chỉ các nhóm có mặt ở cả hai nửa; trọng số chuẩn hóa lại trên các nhóm này"
+  report: [n_lenders, n_msas, n_records, median_msas_per_lender, share_lenders_in_le2_msas,
+           lender_full_sd, lender_signal_sd, msa_full_sd, msa_signal_sd]
+
+# -----------------------------------------------------------------------------
+# 14. HHI
+# -----------------------------------------------------------------------------
+hhi:
+  shares_from: "originations (action_taken = 1) trong mẫu core, mọi lender, theo MSA x lei"
+  msa_set: "tập MSA chung"
+  formula: "HHI = 10000 * sum(share^2)"
+  compare_with: "O/E theo MSA (E = p_ext)"
+  correlation: spearman
+
+# -----------------------------------------------------------------------------
+# 15. Độ nhạy theo định nghĩa từ chối
+# -----------------------------------------------------------------------------
+denial_definition_sensitivity:
+  lenders: ">= 500 hồ sơ decisioned (không xét điều kiện 80%), tức 812 lender"
+  compare: "tỷ lệ từ chối thô theo định nghĩa main và alternative"
+  outputs: [spearman, share_changing_quintile]
+
+# -----------------------------------------------------------------------------
+# 16. Chất lượng dữ liệu
+# -----------------------------------------------------------------------------
+data_quality:
+  special_code_table:
+    sample: all_records
+    fields: [debt_to_income_ratio, combined_loan_to_value_ratio, income, interest_rate,
+             rate_spread, loan_term, property_value, open_end_line_of_credit,
+             business_or_commercial_purpose, county_code]
+    codes: ["NA", "Exempt", "1111", "8888", "9999", ""]
+  field_profile:                    # profiling đủ 99 trường
+    sample: all_records
+    fields: all
+    count_codes: ["NA", "Exempt", "1111", "8888", "9999", ""]
+    numeric_pattern: "^-?[0-9]+(\\.[0-9]+)?$"   # đếm giá trị có dạng số
+  duplicates: "đếm dòng trùng hoàn toàn trên 99 cột (bỏ row_id), bằng hash 64-bit; chỉ báo cáo, không xóa"
+  missing_location: "đếm và tỷ lệ từ chối của hồ sơ thiếu state, county, tract (mẫu decisioned và usable)"
+  wilson_interval: {z: 1.96, apply_when_denominator_below: 1000}
+
+reporting:
+  rounding: {percent: 1, percentage_points: 1, oe: 2, correlation: 2, sd_pp: 1}
+
+# -----------------------------------------------------------------------------
+# 17. Lấy mẫu và nhân bản (thí nghiệm hiệu năng)
+# -----------------------------------------------------------------------------
+sampling:
+  # bucket = ((row_id * 2654435761) mod 4294967296) mod 100 ; lấy p% thì giữ bucket < p.
+  # Không tràn int64: row_id lớn nhất (bản nhân x8) khoảng 7.2e8, tích < 2^62.
+  hash_multiplier: 2654435761
+  hash_modulus: 4294967296
+  buckets: 100
+  fractions: [10, 25, 50, 100]      # phần trăm của mẫu core
+  dev_sample_bucket_lt: 1
+  replicas:
+    factors: [2, 4, 8]              # chỉ nhân dữ liệu 2024
+    row_id_offset: 100000000        # bản sao thứ k (k = 0..factor-1): row_id + k * offset
+
+# -----------------------------------------------------------------------------
+# 18. Đo hiệu năng
+# -----------------------------------------------------------------------------
+performance:
+  # Bản nhân x2, x4, x8 CHỈ dùng cho benchmark; mọi kết quả phân tích dùng file gốc.
+  input_table: perf_core            # bảng core đã làm sạch, đúng kiểu, có p_ext (tạo một lần, không tính giờ)
+  columns: [row_id, lei, state_code, county_code, county_valid, msa, action_taken, loan_type, loan_purpose,
+            loan_amount, decisioned, denied, usable, y, p_ext]
+  copy_input_to: /tmp
+  sizes: ["10%", "25%", "50%", "100%", "x2", "x4", "x8"]   # % theo bucket hash (mục 17); xk theo replicas
+  workloads:
+    W0: "đọc CSV gốc 99 cột ở 1x, đếm dòng: Pandas engine c, Pandas engine pyarrow, Spark"
+    W1: "decisioned: theo loan_type x loan_purpose: n, tỷ lệ từ chối, trung bình loan_amount"
+    W2: "decisioned, county hợp lệ: theo county_code: n, tỷ lệ từ chối"
+    W3: "usable: join TS (broadcast) lấy agency_code; O/E theo lender; xếp hạng O/E trong từng agency (window);
+         10 vòng hiệu ứng hai chiều lender + MSA (MSA khác 99999)"
+  w0_source: "CSV gốc tải từ FFIEC nếu notebook có Internet; nếu không, ghi lại CSV từ Parquet và ghi rõ trong báo cáo"
+  two_way_iterations_benchmark: 10
+  modes:
+    pandas: {load: "đọc Parquet vào RAM, đo riêng", warm: "tính trên dữ liệu đã nạp", cold: "load + warm"}
+    spark: {init: "khởi tạo SparkSession, đo riêng", no_cache: "đọc Parquet + tính, mỗi lần chạy",
+            cache: "cache() + count() đo riêng (dựng cache), sau đó tính trên bản cache"}
+  warmup_runs: 1
+  timed_runs: 5
+  statistic: median                 # kèm min và max
+  one_action_per_workload: true     # trừ vòng lặp hai chiều của W3: Spark cần localCheckpoint mỗi vòng
+                                    # (không cắt lineage thì kế hoạch truy vấn phình to và JVM hết bộ nhớ)
+  isolation: "mỗi cặp (engine, kích thước) chạy trong một tiến trình con riêng"
+  memory:
+    sampling_interval_s: 0.2
+    measure: "RSS cao nhất của tiến trình con cộng mọi tiến trình cháu (JVM của Spark)"
+    budget_share_of_ram: 0.90       # vượt ngưỡng: dừng tiến trình con, ghi là hết bộ nhớ (OOM)
+    oom_record: [engine, size, rows, peak_rss_gb, seconds_until_stop, stage]
+    stop_pandas_after_first_oom: true
+    extend_until_pandas_oom: [16, 32, 64]   # nếu Pandas chưa hết bộ nhớ ở x8: tăng tiếp tới khi hết (đủ đĩa),
+                                            # rồi chạy Spark ở đúng mức đó để so
+  equality_check: "ở 100%, kết quả W1, W2, W3 của Pandas và Spark phải khớp (1e-9; hai chiều 1e-6)"
+  record: [engine, workload, size, rows, mode, run, seconds, peak_rss_gb, status, environment, rules_version]
+
+# -----------------------------------------------------------------------------
+# 19. Kiểm tra tương đương Pandas vs PySpark
+# -----------------------------------------------------------------------------
+equivalence:
+  outputs:
+    1_filter_counts: "số dòng sau từng bước core_filters, cộng decisioned, usable, pricing"
+    2_special_codes: "bảng data_quality.special_code_table"
+    3_action_taken: "số lượng và tỷ trọng action_taken 1-8, mọi bản ghi"
+    4_amounts_by_loan_type: >
+      mẫu decisioned: mean và median của income (giá trị số, kể cả <= 0 và > 10000)
+      và loan_amount theo loan_type; mẫu pricing: mean và median rate_spread hợp lệ theo
+      loan_type, cùng số lượng dạng số / NA / Exempt / ngoài khoảng
+    5_denial_by_state: "mẫu decisioned, MỌI giá trị state_code kể cả NA, PR, GU, VI"
+    6_top50_lenders: >
+      50 lei có nhiều hồ sơ decisioned nhất (hòa thì lei tăng dần); mỗi lei: n decisioned,
+      n denied, tỷ lệ từ chối, mean income, mean loan_amount, n usable, O/E
+  tolerance:
+    counts: exact
+    means_rates_sums: 1.0e-9        # sai số tương đối
+    iterative: 1.0e-6               # mô hình hai chiều
+  medians: [pandas_median, spark_percentile, spark_percentile_approx]
+  # pandas_median và spark_percentile phải khớp; percentile_approx chỉ báo độ lệch.
+
+# -----------------------------------------------------------------------------
+# 20. Mô hình dự đoán (có điều kiện)
+# -----------------------------------------------------------------------------
+prediction:
+  sample: usable                    # hồ sơ đủ dữ liệu, không imputation
+  target: "action_taken == '3'"
+  features:
+    numeric: [dti_ordinal, combined_loan_to_value_ratio, loan_to_income, loan_amount, income]
+    categorical: [loan_type, loan_purpose]
+  excluded:
+    protected: [derived_sex, derived_race, derived_ethnicity, applicant_sex, co_applicant_sex,
+                "applicant_race_*", "co_applicant_race_*", "applicant_ethnicity_*",
+                "co_applicant_ethnicity_*", applicant_age, co_applicant_age]
+    identity_and_location: [lei, state_code, county_code, derived_msa_md, census_tract]
+    post_decision: ["denial_reason_*", interest_rate, rate_spread, total_loan_costs,
+                    origination_charges, discount_points, lender_credits, purchaser_type,
+                    hoepa_status, "aus_*"]
+  folds:
+    # Chia theo lender, tất định, giống nhau ở Python và Spark:
+    #   Python: int(hashlib.sha256(lei.encode()).hexdigest()[:8], 16) % 5
+    #   Spark : F.conv(F.substring(F.sha2("lei", 256), 1, 8), 16, 10).cast("long") % 5
+    k: 5
+    method: cross_fitting           # mỗi fold dự đoán bằng mô hình học trên 4 fold còn lại
+  models: [logistic_regression, gradient_boosted_trees]
+  metrics_on: out_of_fold
+  metrics: [roc_auc, pr_auc, brier, calibration_in_the_large, calibration_slope]
+  use_only_if: "|mean(p) - mean(y)| < 0.005 và calibration_slope trong [0.9, 1.1]"
+  oe_comparison: "E = xác suất out-of-fold; O/E theo 767 lender; Spearman với O/E theo ô"
+
+# -----------------------------------------------------------------------------
+# 21. Kiểm định bước nhảy DTI (H2)
+# -----------------------------------------------------------------------------
+dti_jump_test:
+  sample: usable                    # tỷ lệ từ chối thô theo từng mức DTI thứ bậc
+  by: [all, "1", "2", "3"]          # toàn bộ và từng loại vay (conventional, FHA, VA)
+  levels: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]   # DTI 36..49 và nhóm 50-60
+  baseline_step: "(r_49 - r_36) / 13, tức bước trung bình giữa hai giá trị liền kề trong 36-49"
+  jumps:
+    - {label: "49 -> 50-60", from: 17, to: 18, role: main}
+    - {label: "42 -> 43",    from: 10, to: 11, role: check}
+    - {label: "44 -> 45",    from: 12, to: 13, role: check}
+    - {label: "39 -> 40",    from: 7,  to: 8,  role: placebo}
+    - {label: "46 -> 47",    from: 14, to: 15, role: placebo}
+  statistic: "excess = (r_to - r_from) - baseline_step"
+  variance: "tổ hợp tuyến tính của các tỷ lệ độc lập: Var = sum c_j^2 r_j (1 - r_j) / n_j (gộp hệ số khi trùng mức)"
+  ci_z: 1.96
+  bunching: "n(49) / trung bình n(44..48)"
+  note: "50-60 là một nhóm 11 giá trị, nên bước 49 -> 50-60 so một giá trị với trung bình của cả nhóm"
+
+# -----------------------------------------------------------------------------
+# 22. Chẩn đoán nhóm DTI dưới 20%
+# -----------------------------------------------------------------------------
+dti_low_diagnostic:
+  sample: usable
+  levels: [1, 2, 3]                 # <20, 20-<30, 30-<36
+  tables:
+    - "tỷ lệ từ chối theo mức DTI x loan_type x loan_purpose, có n và khoảng Wilson"
+    - "tỷ lệ hồ sơ bị từ chối nêu từng lý do, theo mức DTI"
+    - "cơ cấu loan_type, loan_purpose; trung vị income, loan_amount, LTI, CLTV theo mức DTI"
+  note: "loại nhà đã cố định trong mẫu core (site-built 1-4 căn)"
+
+# -----------------------------------------------------------------------------
+# 23. Phân tán rate spread đã chuẩn hóa rủi ro (SQ4, vế giá)
+# -----------------------------------------------------------------------------
+spread_dispersion:
+  sample: "pricing ∩ usable"
+  expected_spread: "trung bình rate_spread của ô rủi ro x loan_type x loan_purpose; ô < 30 dùng ô rủi ro x loan_type"
+  residual: "sres = rate_spread - expected_spread"
+  groups:
+    lender: "767 lender, mọi vùng"
+    msa: "tập MSA chung, trong phạm vi địa lý"
+  min_group_n: 100
+  tau: "tau^2 = Var(trung bình sres theo nhóm, ddof 1) - mean(phương sai trong nhóm / n)"

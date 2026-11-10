@@ -1,0 +1,10 @@
+item,n
+"exact duplicate rows (99 fields, all records)",26755
+decisioned: income NA,204891
+decisioned: income <= 0,35862
+"decisioned: income > 10,000 (flag only)",415
+"decisioned: CLTV numeric but outside (0, 250]",1025
+decisioned: DTI missing,251176
+core: county_code not 5 digits,25816
+core: tract ratio 0 (treated as missing),56738
+"core originations: rate_spread outside [-8, 15]",56

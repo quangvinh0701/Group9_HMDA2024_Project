@@ -1,0 +1,11 @@
+Quantity,Values compared,Agree,Max relative difference,Explanation
+(1) Row counts after each filter,13,True,0.0,khớp tuyệt đối
+"(2) Special-code counts, 10 fields",60,True,0.0,khớp tuyệt đối
+"(2b) Field profile, all 99 fields (codes and numeric values)",693,True,0.0,khớp tuyệt đối
+(3) action_taken counts and shares,16,True,0.0,khớp tuyệt đối
+"(4) Mean and median of income, loan amount, rate spread by loan type",36,True,2.8033131371785203e-15,"khớp trong dung sai, sai lệch tương đối lớn nhất 2.8e-15 (thứ tự cộng số thực)"
+"(4b) Rate spread: numeric, NA, Exempt, out of range",20,True,0.0,khớp tuyệt đối
+"(5) Denial rate by state (all codes, including NA)",165,True,0.0,khớp tuyệt đối
+(6) Aggregates of the 50 largest lenders,450,True,1.2449849618904487e-13,"khớp trong dung sai, sai lệch tương đối lớn nhất 1.2e-13 (thứ tự cộng số thực)"
+(4) percentile_approx vs exact median (Spark),12,True,0.0010000000000000009,chỉ báo cáo: percentile_approx lệch tối đa 1.00e-03 so với percentile chính xác
+"Key analysis numbers (SQ1-SQ4, two-way, HHI)",229,True,2.6772912587955283e-12,"khớp trong dung sai; khóa chỉ có một bên: ['pred_corr_mllib_vs_sklearn_lr', 'pred_fold_mismatch_vs_pandas', 'pred_fold_mismatch_vs_python', 'pred_maxdiff_mllib_vs_sklearn_lr', 'pred_mllib_lr_calibration_in_the_large', 'pred_mllib_lr_pr_auc', 'pred_mllib_lr_roc_auc', 'pred_p_gbt_brier']"

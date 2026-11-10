@@ -1,0 +1,49 @@
+check,value,expected,expected_status,match
+all_records,12259199.0,12259199.0,verified,True
+core_filters.applications,10781992.0,10781992.0,single,True
+core_filters.first_lien,7981147.0,7981147.0,single,True
+core_filters.closed_end,7258042.0,7258042.0,single,True
+core_filters.non_business,6694328.0,6694328.0,single,True
+core_filters.non_reverse,6690389.0,6690389.0,single,True
+core_filters.site_built_1_4_unit,6088849.0,6088849.0,single,True
+core_filters.principal_residence,5775325.0,5775325.0,verified,True
+open_end_exempt_removed,216601.0,216601.0,single,True
+decisioned,4514505.0,4514505.0,verified,True
+usable,4100051.0,4100051.0,verified,True
+dev_sample_1pct,57699.0,57699.0,single,True
+income NA,204891.0,204891.0,verified,True
+income <= 0,35862.0,35862.0,verified,True
+income > 10000,415.0,415.0,verified,True
+state codes in core (kể cả NA),55.0,55.0,verified,True
+county codes in core (kể cả NA),3219.0,3219.0,single,True
+county codes hợp lệ (5 chữ số),3218.0,,pending,
+MSA codes in core (kể cả 99999),418.0,418.0,single,True
+MSA thật (bỏ 99999),417.0,,pending,
+usable PR,12793.0,12793.0,verified,True
+usable GU,123.0,123.0,verified,True
+usable VI,23.0,23.0,verified,True
+"thiếu bang, usable",6731.0,6731.0,verified,True
+"thiếu bang, decisioned",8643.0,8643.0,single,True
+rate_spread dạng số,3616605.0,3616605.0,verified,True
+rate_spread NA,43549.0,43549.0,single,True
+rate_spread Exempt,237.0,237.0,single,True
+"rate_spread ngoài [-8, 15]",56.0,,pending,
+|rate_spread| > 10,65.0,65.0,single,True
+pricing ∩ usable,3367479.0,3367522.0,pending,
+số ô rủi ro,90.0,90.0,verified,True
+ô rủi ro nhỏ nhất,311.0,311.0,verified,True
+FHA ít nhất mỗi ô,75.0,75.0,verified,True
+Kitagawa FHA vs conv: gap,0.07998135941342066,0.08,verified,True
+Kitagawa FHA vs conv: composition,0.06733786857608731,0.0673,verified,True
+Kitagawa FHA vs conv: rate,0.012643490837333288,0.0126,verified,True
+O usable denied,574298.0,574298.0,verified,True
+E usable,572529.2955855259,572529.3,verified,True
+O/E toàn quốc,1.0030892819426214,1.0031,verified,True
+số ô mở rộng,1504.0,1504.0,verified,True
+tỷ lệ fallback,0.0011341322339648945,0.0011,verified,True
+O/E nhóm thiếu bang,2.226510272404793,2.227,verified,True
+số bang trong phạm vi,51.0,51.0,pending,
+tập MSA chung,392.0,,pending,
+lender >= 500 decisioned,812.0,812.0,verified,True
+lender phân tích,767.0,767.0,verified,True
+lender không có hồ sơ từ chối (trong 767),11.0,11.0,single,True

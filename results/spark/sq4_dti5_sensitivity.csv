@@ -1,0 +1,13 @@
+key,value
+dti5_n_risk_cells,75.0
+dti5_smallest_cell_n,311.0
+dti5_national_oe,1.0026168128375919
+dti5_tau_lender,0.5017093764151355
+dti5_spearman_lender_oe,0.9999401882349913
+dti5_kitagawa_loan_type_2v1_gap,0.07998135941342065
+dti5_kitagawa_loan_type_2v1_composition,0.06700520545328652
+dti5_kitagawa_loan_type_2v1_rate,0.012976153960134107
+dti5_kitagawa_loan_type_2v1_rate_gap_at_a_mix,-0.12320855927657916
+dti5_kitagawa_loan_type_2v1_rate_gap_at_b_mix,0.1491608671968474
+dti5_kitagawa_loan_type_2v1_cells_a_higher,43.0
+dti5_kitagawa_loan_type_2v1_cells_a_lower,32.0

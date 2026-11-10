@@ -1,0 +1,215 @@
+# =============================================================================
+# expected.yaml - Số kiểm tra cho project HMDA 2024, Nhóm 9
+#
+# Đi kèm rules.yaml 1.1. File này cập nhật bất cứ lúc nào có số mới, không cần
+# đổi phiên bản rules. Mỗi số ghi: giá trị, phạm vi, nguồn, trạng thái.
+#
+# Trạng thái:
+#   verified : ít nhất hai nguồn độc lập ra cùng số
+#   single   : mới có một nguồn; pipeline còn lại cần xác nhận
+#   pending  : chưa có số theo rules hiện hành (số cũ, nếu có, ghi ở old_value)
+#
+# Nguồn: profile = profile_hmda.py (Vinh); kaggle = notebook thử môi trường
+# (Pandas + Spark); son = pipeline Spark; cong = pipeline Pandas (bản cũ);
+# v1_pandas, v1_spark = notebook HMDA v1 chạy trên Kaggle ngày 2026-11-07.
+# =============================================================================
+
+rules_version: "1.1"
+updated: "2026-11-07 (HMDA v1 trên dữ liệu thật: Pandas và Spark khớp nhau ở mọi đầu ra; mọi số cũ đều khớp; điền các số pending)"
+
+# -----------------------------------------------------------------------------
+# Cỡ mẫu
+# -----------------------------------------------------------------------------
+rows:
+  all_records:            {value: 12259199, source: [profile, kaggle], status: verified}
+  purchased_loans:        {value: 1276504,  scope: "action_taken 6", source: [profile], status: single}
+  preapprovals:           {value: 200703,   scope: "action_taken 7-8", source: [profile], status: single}
+
+core_filters:             # số dòng SAU từng bước
+  applications:           {value: 10781992, source: [profile], status: single}
+  first_lien:             {value: 7981147,  source: [profile], status: single}
+  closed_end:             {value: 7258042,  source: [profile], status: single}
+  non_business:           {value: 6694328,  source: [profile], status: single}
+  non_reverse:            {value: 6690389,  source: [profile], status: single}
+  site_built_1_4_unit:    {value: 6088849,  source: [profile], status: single}
+  principal_residence:    {value: 5775325,  source: [profile, kaggle], status: verified}
+  open_end_exempt_removed: {value: 216601,  scope: "loại ở bước closed_end vì mã 1111", source: [profile], status: single}
+
+samples:
+  decisioned:             {value: 4514505,  source: [profile, kaggle], status: verified}
+  usable:                 {value: 4100051,  share_of_decisioned: 0.908, source: [profile, son], status: verified}
+  dev_sample_1pct:        {value: 57699,    scope: "bucket < 1 trên mẫu core", source: [son], status: single}
+
+# -----------------------------------------------------------------------------
+# Income
+# -----------------------------------------------------------------------------
+income:
+  na_decisioned:          {value: 204891, source: [son, cong], status: verified}
+  non_positive_decisioned: {value: 35862, source: [profile, cong], status: verified}
+  above_10000_decisioned: {value: 415,    source: [profile, cong], status: verified}
+  identity_check: "204,891 + 35,862 = 4,514,505 - 4,273,752 (income > 0) = 240,753"
+  numeric_1111_all:       {value: 77, source: [profile], status: single}
+  numeric_8888_all:       {value: 11, source: [profile], status: single}
+  numeric_9999_all:       {value: 27, source: [profile], status: single}
+
+# -----------------------------------------------------------------------------
+# Lender
+# -----------------------------------------------------------------------------
+lenders:
+  distinct_lei_core:      {value: 2821, source: [profile], status: single}
+  min500_decisioned_only: {value: 812, share_of_decisioned: 0.9395, source: [profile, son, cong], status: verified}
+  distinct_lei_decisioned: {value: 2808, source: [son], status: single}
+  zero_denials_in_767:    {value: 11, source: [son], status: single, note: "lender >= 500 decisioned mà không có hồ sơ từ chối nào"}
+  analysis_set:           {value: 767, scope: ">= 500 decisioned và >= 80% usable", source: [profile, cong], status: verified}
+  min500_usable_not_used: {value: 773, source: [cong], status: single}
+
+# -----------------------------------------------------------------------------
+# Địa lý
+# -----------------------------------------------------------------------------
+geography:
+  state_codes_in_core:    {value: 55, scope: "51 trong phạm vi + PR + GU + VI + NA", source: [profile, son], status: verified}
+  universe_states:        {value: 51, source: [v1_pandas, v1_spark], status: verified}
+  usable_PR:              {value: 12793, source: [son, cong], status: verified}
+  usable_GU:              {value: 123,   source: [son, cong], status: verified}
+  usable_VI:              {value: 23,    source: [son, cong], status: verified}
+  missing_state_usable:   {value: 6731, denial_rate: 0.642, source: [son, cong], status: verified}
+  missing_state_usable_oe: {value: 2.227, tol: 5.0e-4, source: [cong, son], status: verified}
+  missing_state_decisioned: {value: 8643, denial_rate: 0.657, source: [son], status: single}
+  county_codes_in_core:   {value: 3219, scope: "đếm cả chuỗi NA như một mã", source: [profile], status: single}
+  county_codes_valid:     {value: 3218, scope: "mã 5 chữ số, bỏ NA", source: [v1_pandas, v1_spark], status: verified, note: "proposal ghi 3,219 là tính cả NA"}
+  msa_codes_in_core:      {value: 418, scope: "đếm cả 99999", source: [profile], status: single}
+  msa_codes_real:         {value: 417, scope: "bỏ 99999", source: [v1_pandas, v1_spark, son], status: verified, note: "proposal ghi 418 là tính cả 99999"}
+  msa_common_set:         {value: 392, old_value: 373, scope: "MSA >= 1000 usable trong phạm vi 51 bang, đếm trước khi lọc lender", source: [v1_pandas, v1_spark], status: verified}
+  tract_ratio_zero_all:   {value: 407198,  source: [profile], status: single}
+  nonmetro_99999_all:     {value: 1781406, source: [profile], status: single}
+
+# -----------------------------------------------------------------------------
+# Ô rủi ro (DTI 6 nhóm, rules 1.1)
+# tol: sai số tương đối cho phép khi so (số đã làm tròn)
+# -----------------------------------------------------------------------------
+risk_cells:
+  n_cells:                {value: 90, source: [profile, cong, son], status: verified}
+  smallest_cell_n:        {value: 311, source: [profile, cong, son], status: verified}
+  min_fha_per_cell:       {value: 75, source: [profile, cong, son], status: verified}
+  extended_cells:         {value: 1504, source: [profile, cong, son], status: verified}
+  fallback_share:         {value: 0.0011, tol: 0.05, source: [profile, cong, son], status: verified}
+  lti_cuts_unchanged:     "q1, q2 không phụ thuộc cách chia DTI (cùng mẫu usable)"
+
+national_oe:
+  O_usable_denied:        {value: 574298, source: [son, cong], status: verified, note: "không phụ thuộc cách chia DTI"}
+  E_usable:               {value: 572529.3, tol: 1.0e-6, source: [cong, son], status: verified}
+  oe:                     {value: 1.0031, tol: 5.0e-5, source: [cong, son], status: verified,
+                           note: "chỉ lệch 1 do nhóm fallback; trong các ô >= 30 thì O = E đúng tuyệt đối"}
+
+kitagawa_fha_vs_conventional:   # điểm phần trăm / 100, mẫu usable toàn quốc
+  gap:                    {value: 0.0800, tol: 0.001, source: [cong, son], status: verified}
+  composition:            {value: 0.0673, tol: 0.001, source: [cong, son], status: verified}
+  rate:                   {value: 0.0126, tol: 0.005, source: [cong, son], status: verified}
+
+# -----------------------------------------------------------------------------
+# Giá
+# -----------------------------------------------------------------------------
+rate_spread_pricing:      # mẫu core, action_taken 1
+  numeric:                {value: 3616605, source: [son, cong], status: verified}
+  na:                     {value: 43549,   source: [son], status: single}
+  exempt:                 {value: 237,     source: [son], status: single}
+  max_raw:                {value: 3960,    source: [son], status: single}
+  min_raw:                {value: -385,    source: [son], status: single}
+  abs_above_5:            {value: 4382, source: [son], status: single}
+  abs_above_10:           {value: 65, share_of_numeric: 0.000018, source: [son], status: single}
+  abs_above_10_usable:    {value: 61, source: [son, cong], status: verified}
+  outside_valid_range:    {value: 56, share_of_numeric: 0.0000155, scope: "core, action_taken 1, ngoài [-8, 15]", source: [v1_pandas, v1_spark], status: verified}
+  pricing:                {value: 3616549, scope: "core, action_taken 1, rate_spread trong [-8, 15]", source: [v1_pandas, v1_spark], status: verified}
+  pricing_usable:         {value: 3367479, old_value: 3367522, scope: "usable ∩ pricing", source: [v1_pandas, v1_spark], status: verified,
+                           note: "chênh 43 so với số cũ của Công là các hồ sơ ngoài [-8, 15]"}
+
+# -----------------------------------------------------------------------------
+# Kết quả phân tích theo rules 1.1 (HMDA v1, Kaggle 2026-11-07)
+# Pandas và Spark ra cùng số (sai lệch tương đối lớn nhất 2.7e-12), nên ghi verified.
+# Tỷ lệ ghi dạng 0-1; rate spread ghi theo điểm phần trăm.
+# -----------------------------------------------------------------------------
+results:
+  denial_rates_decisioned:
+    all:            {value: 0.15431, tol: 1.0e-4, source: [v1_pandas, v1_spark], status: verified}
+    conventional:   {value: 0.13245, tol: 1.0e-4, source: [v1_pandas, v1_spark], status: verified}
+    FHA:            {value: 0.21756, tol: 1.0e-4, source: [v1_pandas, v1_spark], status: verified}
+    VA:             {value: 0.15206, tol: 1.0e-4, source: [v1_pandas, v1_spark], status: verified}
+    USDA:           {value: 0.12063, tol: 1.0e-4, source: [v1_pandas, v1_spark], status: verified}
+  duplicates_99_fields:     {value: 26755, source: [v1_pandas, v1_spark], status: verified}
+  dti_jump_test:            # excess = (r_to - r_from) - bước trung bình 36..49; CI 95%
+    conventional_49_to_5060:  {value: 0.6508, ci: [0.6472, 0.6545], tol: 1.0e-3, source: [v1_pandas, v1_spark], status: verified}
+    conventional_42_to_43:    {value: 0.0024, ci: [0.0002, 0.0045], tol: 0.05, source: [v1_pandas, v1_spark], status: verified}
+    conventional_44_to_45:    {value: 0.0019, ci: [-0.0003, 0.0042], tol: 0.05, source: [v1_pandas, v1_spark], status: verified}
+    conventional_placebo_39_40: {value: -0.0010, ci: [-0.0032, 0.0012], tol: 0.05, source: [v1_pandas, v1_spark], status: verified}
+    conventional_placebo_46_47: {value: -0.0002, ci: [-0.0027, 0.0022], tol: 0.05, source: [v1_pandas, v1_spark], status: verified}
+    FHA_49_to_5060:           {value: 0.0368, ci: [0.0330, 0.0405], tol: 1.0e-3, source: [v1_pandas, v1_spark], status: verified}
+    VA_49_to_5060:            {value: 0.0268, ci: [0.0211, 0.0326], tol: 1.0e-3, source: [v1_pandas, v1_spark], status: verified}
+    all_49_to_5060:           {value: 0.1641, ci: [0.1623, 0.1658], tol: 1.0e-3, source: [v1_pandas, v1_spark], status: verified}
+    all_42_to_43:             {value: 0.0002, ci: [-0.0018, 0.0021], tol: 0.05, source: [v1_pandas, v1_spark], status: verified}
+    bunching_49:              {conventional: 1.697, FHA: 1.163, VA: 1.101, all: 1.514, note: "n(49) / trung bình n(44..48)"}
+  low_dti:
+    denial_rate:              {lt20: 0.1663, d20_30: 0.0972, d30_36: 0.0877}
+    median_income:            {lt20: 186, d20_30: 138, d30_36: 120}
+    reason_credit_history:    {lt20: 0.4646, d20_30: 0.3484, d30_36: 0.3060}
+    reason_collateral:        {lt20: 0.1745, d20_30: 0.2636, d30_36: 0.2834}
+  kitagawa_purpose:         # mẫu usable toàn quốc, 32 = cash-out, 31 = refinance, 1 = purchase
+    cashout_vs_purchase:      {gap: 0.2269, composition: 0.0067, rate: 0.2203, cells_a_higher: 88, cells: 90}
+    refinance_vs_purchase:    {gap: 0.1286, composition: -0.0303, rate: 0.1590, cells_a_higher: 87, cells: 88}
+  kitagawa_fha_vs_conventional_detail:
+    rate_gap_at_fha_mix:      -0.1241
+    rate_gap_at_conventional_mix: 0.1494
+    cells_fha_higher:         54
+    cells_fha_lower:          36
+  pricing_cashout_vs_purchase:  # rate spread, điểm phần trăm; coverage < 0.5 thì không diễn giải
+    conventional:             {gap: 0.3322, composition: 0.0042, rate: 0.3281, coverage_purchase: 0.824}
+    FHA:                      {gap: 0.2726, coverage_purchase: 0.100, note: "coverage < 0.5, không diễn giải"}
+    VA:                       {gap: 0.4967, composition: -0.1113, rate: 0.6081, coverage_purchase: 0.984}
+  geography:
+    tau_state:                0.0985
+    sd_state_raw_rate:        0.0215
+    sd_state_standardized_rate: 0.0139
+    tau_msa:                  0.1267
+    msa_share_outside_95:     0.673
+    oe_lmi_tracts:            1.143
+    oe_non_lmi_tracts:        0.951
+  lenders:
+    tau_lender:               {value: 0.5017, weighted: 0.4517}
+    share_outside_95:         0.870
+    share_outside_998:        0.778
+    median_oe:                0.657
+    tau_within_conventional:  {value: 0.4946, spearman_vs_main: 0.975}
+    tau_within_FHA:           {value: 0.4928, spearman_vs_main: 0.955}
+    denial_definition_spearman: {value: 0.9874, share_changing_quintile: 0.142}
+    dti5_spearman_lender_oe:  0.99994
+    fallback_robust_spearman: 0.9997
+  spread_dispersion:          {tau_lender: 0.4542, tau_msa: 0.1173, lenders: 758, msas: 392}
+  two_way:
+    lenders: 764
+    msas: 392
+    records: 3266906
+    lender_full_sd: 0.0707
+    lender_signal_sd: 0.0706
+    msa_full_sd: 0.0164
+    msa_signal_sd: 0.0161
+    median_msas_per_lender: 55
+  hhi:                        {median: 400.6, p10: 260.5, p90: 685.4, spearman_with_msa_oe: -0.159, msas: 392}
+  prediction:                 # fold theo lender (sha256 % 5), không dùng lei, vị trí, sắc tộc, giới tính
+    lr_sklearn:               {roc_auc: 0.8047, pr_auc: 0.5482, brier: 0.0886, calibration_slope: 0.982}
+    lr_mllib:                 {roc_auc: 0.8046, pr_auc: 0.5479, source: [v1_spark]}
+    hist_gradient_boosting:   {roc_auc: 0.8356, pr_auc: 0.6248, brier: 0.0795, calibration_slope: 0.986}
+    spearman_lender_oe_cells_vs_lr: 0.9829
+    spearman_lender_oe_cells_vs_gbt: 0.9858
+  performance:                # notebook HMDA v1 performance; chi tiết trong perf_from_log.md
+    pandas_oom_size:          {value: x16, rows: 92405200, peak_gb: 29.0, stage: "W3 run 0"}
+    pandas_peak_gb_x8:        15.99
+    spark_peak_gb_x16:        9.37
+    w0_full_csv_pandas:       "hết RAM (29 GB) với cả engine c và pyarrow"
+    w0_full_csv_spark_peak_gb: 2.20
+    equality_100pct:          "W1, W2 bằng tuyệt đối; W3 sai lệch tương đối <= 1.6e-15"
+
+# Số cũ (trước rules 1.0) giữ lại để biết hướng thay đổi
+old_values:
+  two_way_profile:  {lender_full_sd: 7.06, lender_signal_sd: 7.05, msa_full_sd: 1.64, msa_signal_sd: 1.62, lenders: 767, msas: 373, median_msas_per_lender: 53}
+  two_way_cong:     {lender_full_sd: 6.93, lender_signal_sd: 6.87, msa_full_sd: 1.54, msa_signal_sd: 1.43, median_msas_per_lender: 54}
+  hhi_cong:         {spearman_hhi_oe: -0.17, hhi_median: 366, hhi_p10: 244, hhi_p90: 614}
+  tau_profile:      {lender: 0.50, msa: 0.13, lender_within_conventional: 0.495, lender_within_fha: 0.493}

@@ -1,0 +1,5 @@
+group,tract_missing,n,denial_rate
+has_state,False,4478191,0.15280120923828394
+has_state,True,27671,0.24119113873730622
+missing_state,False,899,0.1724137931034483
+missing_state,True,7744,0.7133264462809917

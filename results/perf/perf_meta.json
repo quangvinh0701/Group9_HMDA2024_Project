@@ -1,0 +1,73 @@
+{
+ "env": {
+  "python": "3.13.18",
+  "platform": "Linux-6.18.55+-x86_64-with-glibc2.39",
+  "cpu_logical": 4,
+  "ram_total_gb": 32.2,
+  "memory_budget_gb": 29.0,
+  "pandas": "2.3.3",
+  "pyarrow": "23.0.1",
+  "pyspark": "4.0.4",
+  "rules_version": "1.1",
+  "w0_source": "original FFIEC CSV"
+ },
+ "sizes": {
+  "10%": {
+   "path": "/tmp/hmda_perf/data/10pct",
+   "rows": 576771,
+   "disk_mb": 6.6
+  },
+  "25%": {
+   "path": "/tmp/hmda_perf/data/25pct",
+   "rows": 1443465,
+   "disk_mb": 16.1
+  },
+  "50%": {
+   "path": "/tmp/hmda_perf/data/50pct",
+   "rows": 2887345,
+   "disk_mb": 31.7
+  },
+  "100%": {
+   "path": "/tmp/hmda_perf/data/100pct",
+   "rows": 5775325,
+   "disk_mb": 63.2
+  },
+  "x2": {
+   "path": "/tmp/hmda_perf/data/x2",
+   "rows": 11550650,
+   "disk_mb": 126.4
+  },
+  "x4": {
+   "path": "/tmp/hmda_perf/data/x4",
+   "rows": 23101300,
+   "disk_mb": 252.8
+  },
+  "x8": {
+   "path": "/tmp/hmda_perf/data/x8",
+   "rows": 46202600,
+   "disk_mb": 505.5
+  },
+  "x16": {
+   "path": "/tmp/hmda_perf/data/x16",
+   "rows": 92405200,
+   "disk_mb": 1011.0
+  }
+ },
+ "equality_100pct": {
+  "W1_max_abs_diff": 0.0,
+  "W2_equal": true,
+  "W3_oe_sum_rel_diff": 1.6117737123702159e-15,
+  "W3_lender_sd_rel_diff": 1.8708708170987051e-16,
+  "W3_msa_sd_rel_diff": 0.0,
+  "W3_top_equal": true
+ },
+ "pandas_oom": [
+  {
+   "size": "x16",
+   "rows": 92405200.0,
+   "peak_rss_gb": 29.002,
+   "stage": "W3 run 0",
+   "seconds": 411.1
+  }
+ ]
+}

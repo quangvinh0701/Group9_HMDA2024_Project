@@ -1,0 +1,9 @@
+type,purpose,n,share_cltv_gt_80
+USDA,purchase,30232,0.9691717385551734
+VA,cash_out_refinance,65764,0.6893133021105772
+FHA,cash_out_refinance,128583,0.011883374940699782
+conventional,purchase,1824839,0.46163195766859433
+FHA,purchase,568525,0.9650745349808716
+conventional,cash_out_refinance,232668,0.01028933931610707
+VA,purchase,246252,0.8971297695044101
+USDA,cash_out_refinance,2,0.5

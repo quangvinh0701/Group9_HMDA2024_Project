@@ -1,0 +1,13 @@
+,value
+twoway_components,1.0
+twoway_lenders,764.0
+twoway_msas,392.0
+twoway_records,3266906.0
+twoway_lender_full_sd,0.07069529763372827
+twoway_msa_full_sd,0.016367301870061298
+twoway_lender_signal_sd,0.0705954287289557
+twoway_msa_signal_sd,0.016100382298251396
+twoway_median_msas_per_lender,55.0
+twoway_share_lenders_le2_msas,0.002617801047120419
+twoway_lenders_both_halves,764.0
+twoway_msas_both_halves,392.0

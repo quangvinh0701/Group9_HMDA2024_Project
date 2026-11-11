@@ -1,0 +1,20 @@
+label,status,peak_rss_gb,seconds,stage,returncode,engine,size,rows
+pandas_W0_pyarrow,oom_budget,29.063,246.6,W0 pyarrow run 0,-9,pandas_pyarrow,W0,
+pandas_W0_c,oom_budget,28.994,144.8,W0 c run 0,-9,pandas_c,W0,
+spark_W0,ok,2.202,216.9,done,0,spark,W0,
+pandas_10%,ok,0.392,6.8,done,0,pandas,10%,576771.0
+pandas_25%,ok,0.664,12.0,done,0,pandas,25%,1443465.0
+pandas_50%,ok,1.223,21.1,done,0,pandas,50%,2887345.0
+pandas_100%,ok,2.184,38.5,done,0,pandas,100%,5775325.0
+pandas_x2,ok,4.13,72.3,done,0,pandas,x2,11550650.0
+pandas_x4,ok,7.732,142.8,done,0,pandas,x4,23101300.0
+pandas_x8,ok,15.992,274.3,done,0,pandas,x8,46202600.0
+spark_10%,ok,4.644,107.8,done,0,spark,10%,576771.0
+spark_25%,ok,7.624,124.3,done,0,spark,25%,1443465.0
+spark_50%,ok,5.075,134.4,done,0,spark,50%,2887345.0
+spark_100%,ok,6.054,156.4,done,0,spark,100%,5775325.0
+spark_x2,ok,5.803,200.5,done,0,spark,x2,11550650.0
+spark_x4,ok,6.344,292.9,done,0,spark,x4,23101300.0
+spark_x8,ok,6.872,469.1,done,0,spark,x8,46202600.0
+pandas_x16,oom_budget,29.002,411.1,W3 run 0,-9,pandas,x16,92405200.0
+spark_x16,ok,9.37,815.7,done,0,spark,x16,92405200.0

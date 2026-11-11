@@ -416,9 +416,9 @@ lines = []
 for s in SIZES:
     d = perf.loc[s]
     lab = s.replace("x", r"$\times$") if s.startswith("x") else s.replace("%", r"\%")
-    def g(v):
-        return "OOM" if np.isnan(v) else f"{v:.2f}"
-    cells = [lab, g(d.pd_load), g(d.pd_W1), g(d.pd_W2), g(d.pd_W3), f"{d.sp_init:.1f}", f"{d.sp_cache_build:.1f}",
+    def g(v, miss="n.r."):
+        return miss if np.isnan(v) else f"{v:.2f}"
+    cells = [lab, g(d.pd_load), g(d.pd_W1), g(d.pd_W2), g(d.pd_W3, "stopped"), f"{d.sp_init:.1f}", f"{d.sp_cache_build:.1f}",
              f"{d.sp_W1_cache:.2f}", f"{d.sp_W1_nocache:.2f}", f"{d.sp_W2_cache:.2f}", f"{d.sp_W2_nocache:.2f}",
              f"{d.sp_W3_cache:.2f}", f"{d.sp_W3_nocache:.2f}"]
     lines.append(" & ".join(cells) + r" \\")

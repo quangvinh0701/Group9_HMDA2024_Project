@@ -370,22 +370,46 @@ mac("spWThreeEight", fmt(speed(perf.loc["x8", "pd_W3_cold"], perf.loc["x8", "sp_
 mac("spWThreeTen", fmt(speed(perf.loc["10%", "pd_W3_cold"], perf.loc["10%", "sp_W3_nocache"]), 2))
 mac("spWOneTen", fmt(speed(perf.loc["10%", "pd_W1_cold"], perf.loc["10%", "sp_W1_nocache"]), 2))
 
-# performance table (W1 and W3; Pandas cold vs Spark no cache; speedup = T_pandas / T_spark)
+# performance table: W1 and W3, each compared in memory (Pandas warm vs Spark cached) and from disk
+# (Pandas cold vs Spark without cache); speedup = T_pandas / T_spark
+def _cmp(a, b, stopped):
+    if np.isnan(a):
+        return (["stopped", f"{b:.2f}", "Spark only", "--"] if stopped else ["n.r.", f"{b:.2f}", "--", "--"])
+    return [f"{a:.2f}", f"{b:.2f}", "Pandas" if a < b else "Spark", f"{a / b:.2f}"]
+
+
 lines = []
-for s in SIZES:
-    d = perf.loc[s]
-    lab = s.replace("x", r"$\times$") if s.startswith("x") else s.replace("%", r"\%")
-    cells = [lab, f"{d.rows / 1e6:.1f}"]
-    for w in ["W1", "W3"]:
-        a, b = d[f"pd_{w}_cold"], d[f"sp_{w}_nocache"]
-        if np.isnan(a):
-            cells += ["OOM", f"{b:.2f}", "Spark", "--"]
+for w, title in [("W1", r"W1: denial rate and mean loan amount by loan type $\times$ purpose"),
+                 ("W3", r"W3: join, lender $O/E$, ranking, ten two-way iterations")]:
+    lines.append(r"\multicolumn{12}{l}{\emph{" + title + r"}} \\")
+    for s_ in SIZES:
+        d = perf.loc[s_]
+        lab = s_.replace("x", r"$\times$") if s_.startswith("x") else s_.replace("%", r"\%")
+        stopped = (w == "W3") and d.pd_status == "oom_budget"
+        cells = [lab, f"{d.rows / 1e6:.1f}"] + _cmp(d[f"pd_{w}"], d[f"sp_{w}_cache"], stopped) \
+            + _cmp(d[f"pd_{w}_cold"], d[f"sp_{w}_nocache"], stopped)
+        if w == "W1":
+            cells += [f"{d.pd_mem:.1f}" + (r"$^{a}$" if d.pd_status == "oom_budget" else ""), f"{d.sp_mem:.1f}"]
         else:
-            cells += [f"{a:.2f}", f"{b:.2f}", "Pandas" if a < b else "Spark", f"{a / b:.2f}"]
-    pm_ = "OOM" if d.pd_status == "oom_budget" else f"{d.pd_mem:.1f}"
-    cells += [pm_, f"{d.sp_mem:.1f}"]
-    lines.append(" & ".join(cells) + r" \\")
+            cells += ["", ""]
+        lines.append(" & ".join(cells) + r" \\")
+    if w == "W1":
+        lines.append(r"\midrule")
 open(os.path.join(TAB, "perf_main.tex"), "w").write("\n".join(lines) + "\n")
+mac("memWOneEight", fmt(perf.loc["x8", "pd_W1"] / perf.loc["x8", "sp_W1_cache"], 1))
+mac("memWOneTen", fmt(perf.loc["10%", "pd_W1"] / perf.loc["10%", "sp_W1_cache"], 1))
+mac("memWThreeEight", fmt(perf.loc["x8", "pd_W3"] / perf.loc["x8", "sp_W3_cache"], 2))
+mac("memWThreeTen", fmt(perf.loc["10%", "pd_W3"] / perf.loc["10%", "sp_W3_cache"], 2))
+mac("memWThreeEightInv", fmt(perf.loc["x8", "sp_W3_cache"] / perf.loc["x8", "pd_W3"], 1))
+assert (perf["pd_W3"] < perf["sp_W3_cache"]).loc[[z for z in SIZES if z != "x16"]].all()   # Pandas faster in memory at every size
+assert perf.loc["25%", "pd_W1"] < perf.loc["25%", "sp_W1_cache"] and perf.loc["50%", "pd_W1"] > perf.loc["50%", "sp_W1_cache"]
+_pr = pd.read_csv(os.path.join(PF, "perf_runs.csv"))
+_sp = _pr.groupby(["engine", "size", "measure"]).seconds.agg(["min", "median", "max", "count"])
+_sp = _sp[_sp["count"] >= 5]; _sp["spread"] = (_sp["max"] - _sp["min"]) / _sp["median"]
+_sm = _sp.groupby(level=[0, 2]).spread.median()
+mac("spreadPandas", fmt_int(100 * max(_sm[("pandas", w_)] for w_ in ["W1", "W2", "W3"])))
+mac("spreadSparkLo", fmt_int(100 * min(_sm[("spark", f"{w_}_nocache")] for w_ in ["W1", "W2", "W3"])))
+mac("spreadSparkHi", fmt_int(100 * max(_sm[("spark", f"{w_}_nocache")] for w_ in ["W1", "W2", "W3"])))
 
 # warm / cache table
 lines = []
@@ -711,18 +735,17 @@ fig.savefig(os.path.join(FIG, "fig_funnel.pdf"))
 plt.close(fig)
 mac_out_lender_above3 = int((lo.oe > 3.2).sum())
 
-# F5 performance
-fig, (a1, a2) = plt.subplots(1, 2, figsize=(6.8, 2.7))
+# F5 performance: (a) in memory, (b) from disk, (c) peak memory
+fig, (a0, a1, a2) = plt.subplots(1, 3, figsize=(7.0, 2.5))
 xr = perf.rows / 1e6
-for wl, mk in [("W1", "o"), ("W3", "s")]:
-    a1.plot(xr, perf[f"pd_{wl}_cold"], color=C_PD, marker=mk, ms=3, lw=1, label=f"Pandas {wl}")
-    a1.plot(xr, perf[f"sp_{wl}_nocache"], color=C_SP, marker=mk, ms=3, lw=1, ls="--", label=f"Spark {wl}")
-a1.set_xscale("log"); a1.set_yscale("log")
-a1.set_xlabel("Rows (millions, log scale)")
-a1.set_ylabel("Median time (s, log scale)")
-a1.set_title("(a) Time per workload, read from Parquet")
-a1.legend(frameon=False, fontsize=7, ncol=2, loc="upper left")
-a1.text(0.98, 0.04, "Pandas out of memory at ×16", transform=a1.transAxes, ha="right", va="bottom", fontsize=7)
+for ax, pcol, scol, ttl in [(a0, "pd_{}", "sp_{}_cache", "(a) In memory"), (a1, "pd_{}_cold", "sp_{}_nocache", "(b) Read from Parquet")]:
+    for wl, mk in [("W1", "o"), ("W3", "s")]:
+        ax.plot(xr, perf[pcol.format(wl)], color=C_PD, marker=mk, ms=3, lw=1, label=f"Pandas {wl}")
+        ax.plot(xr, perf[scol.format(wl)], color=C_SP, marker=mk, ms=3, lw=1, ls="--", label=f"Spark {wl}")
+    ax.set_xscale("log"); ax.set_yscale("log"); ax.set_ylim(0.025, 80)
+    ax.set_xlabel("Rows (millions, log scale)"); ax.set_title(ttl)
+a0.set_ylabel("Median time (s, log scale)")
+a0.legend(frameon=False, fontsize=6.5, ncol=2, loc="lower right", columnspacing=0.8, handlelength=1.6)
 pm_ok = perf[perf.pd_status == "ok"]
 a2.plot(pm_ok.rows / 1e6, pm_ok.pd_mem, color=C_PD, marker="o", ms=3, lw=1, label="Pandas")
 a2.plot([pm_ok.rows.iloc[-1] / 1e6, perf.loc["x16", "rows"] / 1e6], [pm_ok.pd_mem.iloc[-1], perf.loc["x16", "pd_mem"]],
@@ -730,14 +753,14 @@ a2.plot([pm_ok.rows.iloc[-1] / 1e6, perf.loc["x16", "rows"] / 1e6], [pm_ok.pd_me
 a2.scatter([perf.loc["x16", "rows"] / 1e6], [perf.loc["x16", "pd_mem"]], marker="x", color=C_PD, s=30, zorder=5)
 a2.plot(xr, perf.sp_mem, color=C_SP, marker="o", ms=3, lw=1, ls="--", label="Spark (incl. JVM)")
 a2.axhline(meta["env"]["memory_budget_gb"], color="black", lw=0.7)
-a2.text(0.6, meta["env"]["memory_budget_gb"] + 0.8, f"budget {meta['env']['memory_budget_gb']:.0f} GB (90% of RAM)", fontsize=7)
+a2.text(0.6, meta["env"]["memory_budget_gb"] + 0.8, f"budget {meta['env']['memory_budget_gb']:.0f} GB", fontsize=7)
 a2.set_xscale("log")
 a2.set_xlabel("Rows (millions, log scale)")
 a2.set_ylabel("Peak memory (GB)")
 a2.set_ylim(0, 33)
-a2.set_title("(b) Peak memory per process")
-a2.legend(frameon=False, fontsize=7, loc="center left")
-fig.tight_layout(w_pad=1.2)
+a2.set_title("(c) Peak memory per process")
+a2.legend(frameon=False, fontsize=6.5, loc="center left")
+fig.tight_layout(w_pad=0.8)
 fig.savefig(os.path.join(FIG, "fig_perf.pdf"))
 plt.close(fig)
 

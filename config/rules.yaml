@@ -14,6 +14,9 @@
 #   - Không sửa quy tắc để khớp số cũ của proposal; số lệch thì sửa báo cáo.
 #
 # CHANGELOG
+# 12/11/2026: chỉ sửa lời chú thích, nội dung YAML giống hệt bản 1.1: (a) ô rủi ro dùng 6 nhóm DTI chứ không phải 5;
+#   (b) ghi rõ jumbo, broker/channel3, cost_share, payment_to_income có định nghĩa nhưng không phân tích nào của v1
+#   dùng tới, nên hai notebook không tính các biến này (định nghĩa giữ nguyên cho bản sau).
 # 10/11/2026: chỉ sửa lời chú thích trong CHANGELOG, không đổi quy tắc nào; nội dung YAML giống hệt bản 1.1
 #   đã chạy trên Kaggle ngày 07/11/2026.
 # 1.1 (07/11/2026):
@@ -182,7 +185,7 @@ variables:
       "50-60": 18
       ">60": 19
     # Không có trong bảng (NA, Exempt, trống) -> null. Không gán điểm giữa khoảng.
-    # Phân tích DTI-từ chối (H2) dùng thang 19 mức. Ô rủi ro dùng 5 nhóm dưới đây.
+    # Phân tích DTI-từ chối (H2) dùng thang 19 mức. Ô rủi ro dùng 6 nhóm dưới đây.
     # Khoảng (lo, hi] trên thang thứ bậc.
     bands:                          # 6 nhóm, dùng cho ô rủi ro chính
       - {label: "<30",    lo: 0,  hi: 2}
@@ -240,6 +243,8 @@ variables:
     zero_means_missing: true
     lmi_if_below: 80                # LMI = tỷ lệ < 80
 
+  # Bốn biến jumbo, broker/channel3, cost_share, payment_to_income: không phân tích nào của v1 dùng tới,
+  # hai notebook không tính; định nghĩa giữ lại cho bản sau.
   jumbo:
     column: conforming_loan_limit
     values: {"C": 0, "NC": 1, "U": null, "NA": null}

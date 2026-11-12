@@ -8,3 +8,8 @@ data/
 *.log
 *.out
 *.synctex.gz
+report/main.pdf
+report/main.bbl
+report/main.blg
+report/numbers.json
+report/perf_table_built.csv

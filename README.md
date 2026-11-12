@@ -24,6 +24,7 @@ src/
   build_report_assets.py       step 5: turns results/ into the report's numbers, tables and figures
   py_to_ipynb.py               converts the .py files (with "# %%" cell markers) to notebooks
   gen_synth.py                 synthetic file with the HMDA schema, used to test the code before the real run
+  columns.txt                  the 99 field names in file order, read by gen_synth.py
 notebooks/                     the four notebooks as executed on Kaggle (version 1), with all cell outputs;
                                their code cells are identical to the files in src/
 results/
@@ -147,7 +148,8 @@ content is identical.
 
 `src/check_equivalence.py` compares six required outputs (`eq_1` to `eq_6` in each results folder), the full field
 profile and every key number both pipelines write to `key_numbers.json`. Counts must match exactly, means and rates
-within a relative tolerance of 1e-9, results of the iterative two-way model within 1e-6. Result of the run in this
+within 1e-9 and results of the iterative two-way model within 1e-6 (the difference is divided by the larger magnitude
+when that exceeds one, and taken as is below one). Result of the run in this
 folder: 1,682 values agree, largest relative difference 2.7e-12 (`results/equivalence/equivalence_summary.md`).
 
 ## 7. Performance experiment

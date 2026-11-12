@@ -121,6 +121,8 @@ for k, n in [("all_records", "nAll"), ("applications", "nApps"), ("first_lien", 
              ("usable", "nUsable"), ("pricing", "nPricing"), ("pricing_usable", "nPricingUsable")]:
     mac(n, fmt_int(eq1[k]))
 mac("shareUsable", pct(eq1["usable"] / eq1["decisioned"]))
+mac("nNonPrincipal", fmt_int(eq1["site_built_1_4_unit"] - eq1["principal_residence"]))
+mac("shareNonPrincipal", pct(1 - eq1["principal_residence"] / eq1["site_built_1_4_unit"]))
 mac("nDup", fmt_int(kp["duplicates"]))
 
 eq3 = rd(os.path.join(P, "eq_3_action_taken.csv")).set_index("action_taken")
@@ -150,6 +152,7 @@ out_t = rd(os.path.join(P, "sq1_outcomes_by_type.csv")).set_index("type")
 amt = rd(os.path.join(P, "sq1_loan_amount_originated_by_type.csv")).set_index("type")
 rs_t = rd(os.path.join(P, "sq2_rate_spread_by_type.csv")).set_index("type")
 dt = rd(os.path.join(P, "sq1_denial_by_type.csv")).set_index("type")
+mac("nUSDAdec", fmt_int(dt.loc["USDA", "n_decisioned"]))
 
 # DTI
 d19 = rd(os.path.join(P, "sq2_denial_by_dti_19.csv"))
@@ -256,12 +259,15 @@ mac("nNoState", fmt_int(sep.loc["NA", "n"])); mac("drNoState", pct(sep.loc["NA",
 mac("oeNoState", fmt(sep.loc["NA", "oe"], 2)); mac("oePR", fmt(sep.loc["PR", "oe"], 2))
 mlb = rd(os.path.join(P, "dq_missing_location_by_tract.csv"))
 mac("noStateNoTract", fmt_int(mlb[(mlb.group == "missing_state") & (mlb.tract_missing)]["n"].iloc[0]))
+_ms = mlb[mlb.group == "missing_state"]                      # decisioned applications without a state
+mac("nNoStateDec", fmt_int(_ms["n"].sum())); mac("drNoStateDec", pct((_ms["n"] * _ms["denial_rate"]).sum() / _ms["n"].sum()))
 mpm = rd(os.path.join(P, "dq_missing_location_purpose_mix.csv")).set_index("group")
 mac("noStatePurchase", pct(mpm.loc["missing_state", "purchase"], 0))
 st = rd(os.path.join(P, "sq3_state_oe.csv")).sort_values("oe")
 mac("stateLowName", st.iloc[0].state_code); mac("stateLowOE", fmt(st.iloc[0].oe, 2))
 mac("stateHighName", st.iloc[-1].state_code); mac("stateHighOE", fmt(st.iloc[-1].oe, 2))
 mac("fallbackShare", pct(kp["fallback_share"], 2)); mac("nExtCells", fmt_int(kp["n_ext_cells"]))
+mac("minCellN", fmt_int(kp["smallest_cell_n"]))
 mac("nationalOE", fmt(kp["national_oe"], 4))
 
 # lenders
@@ -285,7 +291,7 @@ mac("twLenderFullSD", pct(kp["twoway_lender_full_sd"], 2)); mac("twMSAFullSD", p
 mac("twRatio", fmt(kp["twoway_lender_signal_sd"] / kp["twoway_msa_signal_sd"], 1))
 mac("twMedianMSA", fmt_int(kp["twoway_median_msas_per_lender"]))
 mac("hhiMedian", fmt_int(kp["hhi_median"])); mac("hhiPten", fmt_int(kp["hhi_p10"])); mac("hhiPninety", fmt_int(kp["hhi_p90"]))
-mac("rhoHHI", fmt(kp["hhi_spearman_oe"], 2).replace("-", "$-$"))
+mac("rhoHHI", fmt(kp["hhi_spearman_oe"], 2))   # used inside math mode, so a plain minus sign is correct
 sens = rd(os.path.join(P, "sq4_sensitivity.csv"))
 mac("tauSensMin", fmt(sens.tau.min(), 2)); mac("tauSensMax", fmt(sens.tau.max(), 2))
 ag = rd(os.path.join(P, "sq4_oe_by_agency.csv")).set_index("agency")
@@ -299,7 +305,11 @@ mac("prLR", fmt(pm.loc["p_lr", "pr_auc"], 3)); mac("prGB", fmt(pm.loc["p_gbt", "
 mac("brLR", fmt(pm.loc["p_lr", "brier"], 4)); mac("brGB", fmt(pm.loc["p_gbt", "brier"], 4))
 mac("slLR", fmt(pm.loc["p_lr", "calibration_slope"], 3)); mac("slGB", fmt(pm.loc["p_gbt", "calibration_slope"], 3))
 mac("aucMLlib", fmt(ks["pred_mllib_lr_roc_auc"], 3)); mac("corrMLlib", fmt(ks["pred_corr_mllib_vs_sklearn_lr"], 4))
+mac("maxDiffMLlib", fmt(ks["pred_maxdiff_mllib_vs_sklearn_lr"], 2))
 mac("rhoPredLR", fmt(kp["pred_spearman_cells_vs_lr"], 3)); mac("rhoPredGB", fmt(kp["pred_spearman_cells_vs_gbt"], 3))
+_cal = rd(os.path.join(P, "pred_calibration_deciles.csv"))
+_c0 = _cal[_cal["model"] == "p_lr"].sort_values("mean_pred").iloc[0]      # lowest decile of the logistic model
+mac("calLRlowPred", pct(_c0["mean_pred"])); mac("calLRlowObs", pct(_c0["observed"]))
 pmo = rd(os.path.join(P, "pred_missingness_by_outcome.csv")).set_index("field")
 mac("missTermDen", pct(pmo.loc["term_num", "denied"])); mac("missTermApp", pct(pmo.loc["term_num", "approved"]))
 mac("missDTIDen", pct(pmo.loc["dti_ordinal", "denied"])); mac("missDTIApp", pct(pmo.loc["dti_ordinal", "approved"]))
@@ -343,7 +353,8 @@ for s in SIZES:
 perf = pd.DataFrame(perf).set_index("size")
 perf.to_csv(os.path.join(OUT, "perf_table_built.csv"))
 oom = meta["pandas_oom"][0]
-mac("oomSize", "16"); mac("oomRows", fmt(oom["rows"] / 1e6, 1)); mac("oomPeak", fmt(oom["peak_rss_gb"], 1))
+assert oom["size"] == SIZES[-1], "largest size in SIZES must be the one where Pandas stopped"
+mac("oomSize", oom["size"].lstrip("x")); mac("oomRows", fmt(oom["rows"] / 1e6, 1)); mac("oomPeak", fmt(oom["peak_rss_gb"], 1))
 mac("budget", fmt(meta["env"]["memory_budget_gb"], 0)); mac("ramTotal", fmt(meta["env"]["ram_total_gb"], 1))
 mac("pdMemEight", fmt(perf.loc["x8", "pd_mem"], 1)); mac("spMemEight", fmt(perf.loc["x8", "sp_mem"], 1))
 mac("spMemSixteen", fmt(perf.loc["x16", "sp_mem"], 1)); mac("pdMemFull", fmt(perf.loc["100%", "pd_mem"], 1))
@@ -485,10 +496,26 @@ for _, r_ in es.iterrows():
         tot += int(r_["Values compared"])
 open(os.path.join(TAB, "eq_summary.tex"), "w").write("\n".join(lines) + "\n")
 mac("eqTotal", fmt_int(tot))
-mac("eqMaxDiff", f"{es[~es.Quantity.str.contains('percentile_approx')]['Max relative difference'].max():.1e}".split("e")[0])
-assert es[~es.Quantity.str.contains("percentile_approx")]["Max relative difference"].max() < 1e-11
-mac("approxErr", fmt(100 * es[es.Quantity.str.contains("percentile_approx")]["Max relative difference"].iloc[0], 1))
+_mx = es[~es.Quantity.str.contains("percentile_approx")]["Max relative difference"].max()
+assert _mx < 1e-9
+mac("eqMaxDiff", f"{_mx:.1e}".split("e")[0]); mac("eqMaxExp", str(int(f"{_mx:.1e}".split("e")[1])))
 mac("nKeyNumbers", fmt_int(es[es.Quantity.str.startswith("Key")]["Values compared"].iloc[0]))
+# where the largest difference sits, and how large the two-way differences are (the text names both)
+_ed = rd(os.path.join(EQ, "equivalence_details.csv"))
+_worst = _ed.sort_values("rel_diff", ascending=False).iloc[0]
+assert _worst["output"] == "key_numbers" and _worst["key"] in ("dti5_national_oe", "national_E", "national_oe", "E_nonfallback"), _worst
+_tw = _ed[(_ed["output"] == "key_numbers") & _ed["key"].str.startswith("twoway_")]["rel_diff"].max()
+assert _tw < 1e-15
+# key numbers that Spark derives from the Pandas out-of-fold predictions (not independent computations)
+_dep = [k for k in ("pred_spearman_cells_vs_lr", "pred_spearman_cells_vs_gbt") if k in set(_ed.loc[_ed["output"] == "key_numbers", "key"])]
+mac("nKeyDependent", {0: "none", 1: "one", 2: "two"}[len(_dep)])
+# percentile_approx against the exact median, from the Spark output: true relative and absolute difference
+_e4 = rd(os.path.join(S, "eq_4_amounts_by_loan_type.csv")).dropna(subset=["median_exact", "median_approx"])
+_abs = (_e4["median_exact"] - _e4["median_approx"]).abs()
+mac("approxErr", fmt(100 * (_abs / _e4["median_exact"].abs()).max(), 2))
+_wa = _e4.loc[_abs.idxmax()]
+assert _wa["variable"] == "rate_spread"
+mac("approxAbs", fmt(_abs.max(), 3))
 
 # ---------------------------------------------------------------- product table
 lines = []
@@ -566,6 +593,15 @@ mac("nIncNA", fmt_int(dqs.loc["decisioned: income NA", "n"]))
 mac("nIncNeg", fmt_int(dqs.loc["decisioned: income <= 0", "n"]))
 mac("nIncHigh", fmt_int(dqs.loc["decisioned: income > 10,000 (flag only)", "n"]))
 mac("exemptN", fmt_int(prof.loc["debt_to_income_ratio", "Exempt"]))
+# field profile excerpt (appendix): all cells from dq_field_profile.csv
+_pl = []
+for f_ in ["debt_to_income_ratio", "rate_spread", "income", "combined_loan_to_value_ratio", "property_value", "loan_term"]:
+    q_ = prof.loc[f_]; oth = int(q_["1111"] + q_["8888"] + q_["9999"])
+    other = "binned" if f_ == "debt_to_income_ratio" else (f"{oth:,}$^{{a}}$" if oth else "--")
+    _pl.append(" & ".join([r"\fd{" + f_ + "}", fmt_int(q_["NA"]), fmt_int(q_["Exempt"]), fmt_int(q_["numeric"]), other]) + r" \\")
+open(os.path.join(TAB, "profile.tex"), "w").write("\n".join(_pl) + "\n")
+_ex = prof.loc[["debt_to_income_ratio", "rate_spread", "combined_loan_to_value_ratio", "property_value", "loan_term"], "Exempt"]
+assert 286_500 <= _ex.min() and _ex.max() <= 289_000      # the text says "about 287,000 records per field"
 mac("dtiNAall", fmt_int(prof.loc["debt_to_income_ratio", "NA"]))
 mac("rsNAall", fmt_int(prof.loc["rate_spread", "NA"]))
 mac("incomeNAall", fmt_int(prof.loc["income", "NA"]))
@@ -612,7 +648,7 @@ mac("loadShareEight", fmt_int(100 * perf.loc["x8", "pd_load"] / perf.loc["x8", "
 
 # ---------------------------------------------------------------- write macros
 with open(os.path.join(OUT, "numbers.tex"), "w") as fh_:
-    fh_.write("% generated by build_assets.py from the Kaggle run outputs; do not edit by hand\n")
+    fh_.write("% generated by build_report_assets.py from the Kaggle run outputs; do not edit by hand\n")
     for k, v in MAC.items():
         fh_.write(f"\\newcommand{{\\{k}}}{{{v}}}\n")
 json.dump(MAC, open(os.path.join(OUT, "numbers.json"), "w"), indent=1, ensure_ascii=False)

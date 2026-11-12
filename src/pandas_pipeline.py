@@ -79,6 +79,10 @@ LT_NAME = {k: v for k, v in R["codes"]["loan_type"].items()}
 LP_NAME = {k: v for k, v in R["codes"]["loan_purpose"].items()}
 UNIVERSE = set(G["universe_states"])
 KEY = {"rules_version": str(R["version"]), "engine": "pandas"}   # số chính, so với PySpark
+import platform, sklearn
+KEY["env_pandas_notebook"] = (f"python {platform.python_version()}; numpy {np.__version__}; pandas {pd.__version__}; "
+                              f"pyarrow {pa.__version__}; scikit-learn {sklearn.__version__}; matplotlib {matplotlib.__version__}")
+print(KEY["env_pandas_notebook"])
 CHECKS = []
 
 
@@ -93,7 +97,9 @@ def exp_value(path):
 
 def check(label, value, path=None):
     ev, st, tol = exp_value(path) if path else (None, None, None)
-    ok = None if (ev is None or value is None or st == "pending") else (abs(float(value) - float(ev)) <= tol * max(1.0, abs(float(ev))))
+    # tol là sai số TƯƠNG ĐỐI (như ghi trong expected.yaml); kỳ vọng bằng 0 thì so tuyệt đối
+    ok = None if (ev is None or value is None or st == "pending") else (
+        abs(float(value) - float(ev)) <= tol * (abs(float(ev)) if float(ev) != 0 else 1.0))
     CHECKS.append({"check": label, "value": value, "expected": ev, "expected_status": st, "match": ok})
     flag = "" if ok is None else ("  OK" if ok else "  <-- LỆCH")
     print(f"  {label:<44} {value!s:>16}   kỳ vọng {ev!s:>12} ({st}){flag}")
@@ -128,6 +134,18 @@ def spearman(x, y):
     return float(x[m].rank(method="average").corr(y[m].rank(method="average")))
 
 
+def occupancy_table(occ):
+    """Tỷ lệ hồ sơ không phải nơi ở chính theo loan_type, trên các hồ sơ đã qua mọi bước lọc trước bước nơi ở chính."""
+    pr_ = next(f["equals"] for f in R["samples"]["core_filters"] if f["step"] == "principal_residence")
+    occ = occ.assign(loan_type=occ["loan_type"].astype(str), occupancy_type=occ["occupancy_type"].astype(str))
+    t = occ.groupby("loan_type")["n"].sum().rename("n_before_filter").to_frame()
+    t["n_non_principal"] = (occ[occ["occupancy_type"] != pr_].groupby("loan_type")["n"].sum()
+                            .reindex(t.index).fillna(0).astype("int64"))
+    t["share_non_principal"] = t["n_non_principal"] / t["n_before_filter"]
+    t.insert(0, "type", [LT_NAME.get(k, k) for k in t.index])
+    return t.reset_index().sort_values("loan_type").reset_index(drop=True)
+
+
 def show():
     if IN_NOTEBOOK:
         plt.show()
@@ -150,9 +168,8 @@ FILT = R["samples"]["core_filters"]
 DQ = R["data_quality"]["special_code_table"]
 KEEP = ["row_id", "lei", "state_code", "county_code", "derived_msa_md", "action_taken", "loan_type",
         "loan_purpose", "loan_amount", "income", "debt_to_income_ratio", "combined_loan_to_value_ratio",
-        "tract_to_msa_income_percentage", "conforming_loan_limit", "submission_of_application",
-        "initially_payable_to_institution", "denial_reason_1", "denial_reason_2", "denial_reason_3",
-        "denial_reason_4", "rate_spread", "interest_rate", "loan_term", "total_loan_costs"]
+        "tract_to_msa_income_percentage", "denial_reason_1", "denial_reason_2", "denial_reason_3",
+        "denial_reason_4", "rate_spread", "loan_term"]
 NEED = sorted(set(KEEP) | {f["column"] for f in FILT} | set(DQ["fields"]))
 READ = ALLCOLS + ["row_id"]          # đọc đủ 99 cột: profiling toàn bộ trường (rules mục 16)
 FP = R["data_quality"]["field_profile"]
@@ -163,6 +180,7 @@ sc_counts = {(f, c): 0 for f in DQ["fields"] for c in DQ["codes"]}
 fp_counts = {(f, c): 0 for f in ALLCOLS for c in FP["count_codes"] + ["numeric"]}
 step_counts = {f["step"]: 0 for f in FILT}
 open_end_exempt_removed = 0
+occ_counts = {}                        # (loan_type, occupancy_type) ngay trước bước lọc nơi ở chính
 dup_hashes = []
 parts = []
 for batch in pf.iter_batches(batch_size=200_000, columns=READ):
@@ -186,6 +204,9 @@ for batch in pf.iter_batches(batch_size=200_000, columns=READ):
         col = tb[f["column"]]
         if f["step"] == "closed_end":
             open_end_exempt_removed += int(pc.sum(pc.equal(col, "1111")).as_py() or 0)
+        if f["step"] == "principal_residence":
+            for k_, n_ in tb.select(["loan_type", f["column"]]).to_pandas().value_counts().items():
+                occ_counts[k_] = occ_counts.get(k_, 0) + int(n_)
         mask = pc.is_in(col, pa.array(f["in"])) if "in" in f else pc.equal(col, f["equals"])
         tb = tb.filter(mask)
         step_counts[f["step"]] += tb.num_rows
@@ -275,42 +296,13 @@ tr = np.where(tr == 0, np.nan, tr) if V["lmi_tract"]["zero_means_missing"] else 
 c["tract_ratio"] = tr
 c["lmi"] = pd.array(np.where(np.isnan(tr), None, tr < V["lmi_tract"]["lmi_if_below"]), dtype="boolean")
 
-# jumbo, broker, channel3
-def map_flag(col, mapping):
-    m = {k: v for k, v in mapping.items() if v is not None}
-    return col.astype(str).map(m).astype("Int8")
-
-
-c["jumbo"] = map_flag(c["conforming_loan_limit"], V["jumbo"]["values"])
-c["broker"] = map_flag(c["submission_of_application"], V["broker"]["values"])
-sub, pay = c["submission_of_application"].astype(str), c["initially_payable_to_institution"].astype(str)
-ch = np.select([sub.isin(["3", "1111"]) | pay.isin(["3", "1111"]), pay == "2",
-                (sub == "1") & (pay == "1"), (sub == "2") & (pay == "1")],
-               [None, "third_party", "retail", "broker"], default=None)
-c["channel3"] = pd.Series(ch, index=c.index, dtype="string")
-
 # Giá
 RSV = V["rate_spread"]["valid_range"]
 c["rs_num"] = to_num(c["rate_spread"], "rate_spread")
 c["rs_valid"] = (c["rs_num"] >= RSV["ge"]) & (c["rs_num"] <= RSV["le"])
 c["rs_out_of_range"] = c["rs_num"].notna() & ~c["rs_valid"]
 c["pricing"] = c["orig"] & c["rs_valid"]
-IRV, LTV_, TCV = V["interest_rate"]["valid_range"], V["loan_term"]["valid_range"], V["total_loan_costs"]["valid_range"]
-c["ir_num"] = to_num(c["interest_rate"], "interest_rate")
-c["ir_valid"] = (c["ir_num"] >= IRV["ge"]) & (c["ir_num"] <= IRV["le"])
-c["term_num"] = to_num(c["loan_term"], "loan_term")
-c["term_valid"] = (c["term_num"] > LTV_["gt"]) & (c["term_num"] <= LTV_["le"])
-c["tlc_num"] = to_num(c["total_loan_costs"], "total_loan_costs")
-c["tlc_valid"] = c["tlc_num"] >= TCV["ge"]
-c["cost_share"] = np.where(c["pricing"] & c["tlc_valid"] & (c["loan_amount_num"] > 0),
-                           c["tlc_num"] / c["loan_amount_num"], np.nan)
-r_m = c["ir_num"] / 1200
-n_m = c["term_num"]
-with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-    pay_m = np.where(r_m == 0, c["loan_amount_num"] / n_m,
-                     c["loan_amount_num"] * r_m / (1 - (1 + r_m) ** (-n_m)))
-ok_pti = c["pricing"] & c["ir_valid"] & c["term_valid"] & inc_ok
-c["pti"] = np.where(ok_pti, pay_m / (1000 * c["income_num"] / 12), np.nan)
+c["term_num"] = to_num(c["loan_term"], "loan_term")   # chỉ dùng cho bảng thiếu dữ liệu theo kết quả (mục 11)
 
 # Địa lý
 st = c["state_code"].astype(str)
@@ -322,7 +314,7 @@ c["msa"] = c["derived_msa_md"].astype(str)
 
 # Lý do từ chối: mã số nguyên, rỗng/NA -> 0
 for i in range(1, 5):
-    c[f"dr{i}"] = np.nan_to_num(to_num(c[f"denial_reason_{i}"], f"denial_reason_{i}"), nan=0).astype("int8")
+    c[f"dr{i}"] = np.nan_to_num(to_num(c[f"denial_reason_{i}"], f"denial_reason_{i}"), nan=0).astype("int16")   # int16: mã Exempt 1111 không vừa int8
 
 print("chuỗi lạ khi chuyển số:", STRANGE or "không có")
 print(f"tạo biến xong | {time.time() - t0:.0f}s")
@@ -377,6 +369,10 @@ del o_
 # Bảng chất lượng dữ liệu
 dq = pd.DataFrame([{"field": f, "code": (code if code else "(empty)"), "count": n} for (f, code), n in sc_counts.items()])
 save(dq, "dq_special_codes")
+occ_t = occupancy_table(pd.DataFrame([{"loan_type": k_[0], "occupancy_type": k_[1], "n": n_} for k_, n_ in occ_counts.items()]))
+save(occ_t, "dq_occupancy_by_type")
+KEY.update({f"occupancy_non_principal_share_{r_.type}": float(r_.share_non_principal) for r_ in occ_t.itertuples()})
+print(occ_t.round(4).to_string(index=False))
 fprof = pd.DataFrame([{"field": f, **{(c if c else "(empty)"): fp_counts[(f, c)] for c in FP["count_codes"] + ["numeric"]}}
                       for f in ALLCOLS])
 fprof["n"] = n_all
@@ -467,7 +463,7 @@ plt.savefig(f"{FIG}/sq1_denial_type_purpose.png", dpi=150); show()
 # ## 5. SQ2: rủi ro, lý do từ chối, phân rã Kitagawa, giá
 # - H2 dùng thang DTI 19 mức (không dùng nhóm).
 # - Lý do từ chối: hồ sơ denied trong mẫu usable; một hồ sơ "nêu" lý do k nếu bất kỳ cột nào trong 4 cột bằng k.
-# - Kitagawa: 75 ô rủi ro, chỉ các ô có >= 30 hồ sơ ở cả hai nhóm; báo thêm chênh tại cơ cấu từng nhóm.
+# - Kitagawa: 90 ô rủi ro, chỉ các ô có >= 30 hồ sơ ở cả hai nhóm; báo thêm chênh tại cơ cấu từng nhóm.
 
 # %%
 UCOLS = ["row_id", "lei", "state_code", "county_code", "msa", "in_universe", "state_missing", "county_valid", "lmi",
@@ -975,7 +971,8 @@ k_ = R["observed_expected"]["extremes_table"]["n_each_side"]
 extremes = pd.concat([srt.head(k_).assign(side="lowest"), srt.tail(k_).iloc[::-1].assign(side="highest")])
 save(extremes[["side"] + [x for x in ex_cols if x in extremes.columns]], "sq4_lender_extremes")
 save(LO.reset_index(names="lei"), "sq4_lender_oe")
-print(extremes[["side", "respondent_name", "n_usable", "oe", "dominant_loan_type", "withdrawn_incomplete_share"]].round(3).to_string(index=False))
+show_cols = ["side", "respondent_name", "n_usable", "oe", "dominant_loan_type", "withdrawn_incomplete_share"]
+print(extremes[[x for x in show_cols if x in extremes.columns]].round(3).to_string(index=False))   # không có TS thì không có tên
 if "agency" in LO:
     ag = LO.groupby("agency")["oe"].agg(n="size", median="median").reset_index(); save(ag, "sq4_oe_by_agency")
 
@@ -1029,14 +1026,19 @@ def cell_agg(df):
     return df.groupby(["li", "mi"]).agg(n=("r", "size"), S=("r", "sum")).reset_index()
 
 
+FIT_LAST_CHANGE = []
+
+
 def fit(cells, iters=R["two_way_effects"]["iterations"]):
     li, mi = cells["li"].to_numpy(), cells["mi"].to_numpy()
     n, S = cells["n"].to_numpy(float), cells["S"].to_numpy(float)
     nl, nm = np.bincount(li, n, nL), np.bincount(mi, n, nM)
     a, b = np.zeros(nL), np.zeros(nM)
     for _ in range(iters):
+        a_old, b_old = a, b
         a = np.divide(np.bincount(li, S - n * b[mi], nL), nl, out=np.zeros(nL), where=nl > 0)
         b = np.divide(np.bincount(mi, S - n * a[li], nM), nm, out=np.zeros(nM), where=nm > 0)
+    FIT_LAST_CHANGE.append(float(max(np.abs(a - a_old).max(), np.abs(b - b_old).max())))   # thay đổi ở vòng lặp cuối
     return a, b, nl, nm
 
 
@@ -1066,6 +1068,9 @@ KEY.update({
     "twoway_msa_signal_sd": max(wcov(b0[okM], b1[okM], nm[okM]), 0) ** .5,
     "twoway_median_msas_per_lender": float(mpl.median()), "twoway_share_lenders_le2_msas": float((mpl <= 2).mean()),
     "twoway_lenders_both_halves": int(okL.sum()), "twoway_msas_both_halves": int(okM.sum())})
+# Theo dõi hội tụ (chỉ bên Pandas): thay đổi lớn nhất của hiệu ứng ở vòng lặp cuối, lấy lớn nhất của ba lần ước lượng
+KEY["conv_twoway_last_iter_max_change"] = max(FIT_LAST_CHANGE)
+print(f"hội tụ: thay đổi lớn nhất ở vòng {R['two_way_effects']['iterations']} là {max(FIT_LAST_CHANGE):.2e}")
 tw_out = {k: v for k, v in KEY.items() if k.startswith("twoway_")}
 pd.Series(tw_out).to_csv(f"{RES}/sq4_two_way.csv", header=["value"])
 pd.DataFrame({"lei": lei_cats[inL], "effect": a[inL], "n": nl[inL]}).to_csv(f"{RES}/sq4_two_way_lender_effects.csv", index=False)

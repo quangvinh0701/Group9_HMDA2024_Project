@@ -202,7 +202,9 @@ if os.environ.get("PERF_SKIP_W0") != "1":
                     w_.write_batch(b)
         W0_SOURCE = "CSV rewritten from Parquet"
     print(W0_SOURCE, W0_CSV, round(os.path.getsize(W0_CSV) / 1e9, 2), "GB")
+    ENV["w0_csv_gb"] = round(os.path.getsize(W0_CSV) / 1e9, 2)
 ENV["w0_source"] = W0_SOURCE
+ENV["raw_parquet_gb"] = round(os.path.getsize(RAW_SRC) / 1e9, 2)
 
 # %% [markdown]
 # ## 3. Mã của tiến trình con (worker) Pandas và Spark
@@ -232,7 +234,9 @@ A = ARGS; RESULT = {"engine": "pandas", "size": A["size"], "times": {}, "results
 COLS = A["columns"]
 if A["mode"] == "w0":
     def w0():
-        if A["engine"] == "pyarrow":
+        if A["engine"] == "arrow":      # kiểu dữ liệu Arrow thật: Arrow tự suy kiểu, chuỗi không thành đối tượng Python
+            df = pd.read_csv(A["csv"], keep_default_na=False, engine="pyarrow", dtype_backend="pyarrow")
+        elif A["engine"] == "pyarrow":  # parser PyArrow nhưng dtype=str ép mọi cột thành chuỗi Python (object)
             df = pd.read_csv(A["csv"], dtype=str, keep_default_na=False, engine="pyarrow", dtype_backend="pyarrow")
         else:
             df = pd.read_csv(A["csv"], dtype=str, keep_default_na=False, engine="c", low_memory=False)
@@ -250,17 +254,17 @@ else:
     ts = pd.read_csv(A["ts"], dtype=str)[["lei", "agency_code"]].drop_duplicates("lei") if A["ts"] else None
 
     def w1():
-        d = df[df["decisioned"]]
+        d = df.loc[df["decisioned"], ["loan_type", "loan_purpose", "y", "loan_amount"]]   # chỉ lấy cột cần, như Spark tự cắt cột
         g = d.groupby(["loan_type", "loan_purpose"]).agg(n=("y", "size"), rate=("y", "mean"), mean_amount=("loan_amount", "mean"))
         return g.reset_index().values.tolist()
 
     def w2():
-        d = df[df["decisioned"] & df["county_valid"]]
+        d = df.loc[df["decisioned"] & df["county_valid"], ["county_code", "y"]]
         g = d.groupby("county_code").agg(n=("y", "size"), rate=("y", "mean"))
         return [len(g), float(g["rate"].sum()), int(g["n"].sum())]
 
     def w3():
-        u = df[df["usable"]]
+        u = df.loc[df["usable"], ["lei", "msa", "y", "p_ext"]]
         lo = u.groupby("lei").agg(O=("y", "sum"), E=("p_ext", "sum")).reset_index()
         lo["agency_code"] = lo["lei"].map(ts.set_index("lei")["agency_code"]) if ts is not None else "NA"
         lo["agency_code"] = lo["agency_code"].fillna("NA")
@@ -283,7 +287,9 @@ else:
 
     for name, fn in [("W1", w1), ("W2", w2), ("W3", w3)]:
         RESULT["times"][name], RESULT["results"][name] = timed(fn, A["warmup"], A["runs"], name)
+        json.dump(RESULT, open(A["out"], "w"), default=str)   # ghi dần: nếu bị dừng vì hết RAM vẫn giữ được workload đã xong
 stage("done")
+RESULT["complete"] = True
 json.dump(RESULT, open(A["out"], "w"), default=str)
 '''
 
@@ -350,6 +356,7 @@ else:
     w1, w2, w3 = make(lambda: spark.read.parquet(A["path"]))
     for name, fn in [("W1", w1), ("W2", w2), ("W3", w3)]:
         RESULT["times"][f"{name}_nocache"], RESULT["results"][name] = timed(fn, A["warmup"], A["runs"], f"{name} no-cache")
+        json.dump(RESULT, open(A["out"], "w"), default=str)
     stage("cache build")
     base = spark.read.parquet(A["path"]).cache()
     t = time.perf_counter(); base.count(); RESULT["times"]["cache_build"] = [time.perf_counter() - t]
@@ -359,6 +366,7 @@ else:
     base.unpersist()
 spark.stop()
 stage("done")
+RESULT["complete"] = True
 json.dump(RESULT, open(A["out"], "w"), default=str)
 '''
 open(f"{WORK}/pandas_worker.py", "w").write(PANDAS_WORKER)
@@ -410,7 +418,7 @@ def run_worker(script, args, label):
     if status == "ok" and rc != 0:
         status = "memory_error" if "MemoryError" in tail or "OutOfMemory" in tail else ("oom_killed" if rc in (-9, 137) else f"error_{rc}")
     st = open(stage_f).read() if os.path.exists(stage_f) else ""
-    res = json.load(open(out)) if (status == "ok" and os.path.exists(out)) else None
+    res = json.load(open(out)) if os.path.exists(out) else None   # worker ghi dần nên có thể chỉ gồm các workload đã xong
     rec = {"label": label, "status": status, "peak_rss_gb": round(peak / 1e9, 3), "seconds": round(time.time() - t0, 1),
            "stage": st, "returncode": rc}
     print(f"  {label:<28} {status:<14} RAM cao nhất {peak / 1e9:6.2f} GB | {rec['seconds']:7.1f}s | giai đoạn cuối: {st}")
@@ -425,7 +433,7 @@ SPARK_ARGS = {"driver_gb": DRIVER_GB, "shuffle_partitions": max(8, 2 * (os.cpu_c
 
 print("W0, đọc CSV gốc 99 cột:")
 if W0_CSV:
-    for eng in ["pyarrow", "c"]:
+    for eng in ["pyarrow", "c", "arrow"]:
         rec, res = run_worker(f"{WORK}/pandas_worker.py", {"mode": "w0", "engine": eng, "csv": W0_CSV, "size": "W0", "path": None},
                               f"pandas_W0_{eng}")
         MEM.append({**rec, "engine": f"pandas_{eng}", "size": "W0", "rows": None}); RESULTS.append(res)
@@ -461,9 +469,10 @@ def write_replica(k):
     return sz
 
 
-# Nếu Pandas chưa hết bộ nhớ ở x8: tăng tiếp tới khi hết (rules: extend_until_pandas_oom), rồi chạy Spark ở đúng mức đó
+# Nếu Pandas chưa hết bộ nhớ ở kích thước lớn nhất: tăng tiếp tới khi hết (rules: extend_until_pandas_oom).
+# Spark chạy ở mọi mức tăng thêm để bảng có đủ hai engine tới đúng điểm Pandas dừng.
 if not pandas_oom:
-    print("Pandas chưa hết bộ nhớ ở x8, tăng tiếp:")
+    print(f"Pandas chưa hết bộ nhớ ở {SIZES[-1]}, tăng tiếp:")
     for k in PF["memory"]["extend_until_pandas_oom"]:
         sz = write_replica(k)
         if sz is None:
@@ -471,12 +480,12 @@ if not pandas_oom:
         SIZES.append(sz)
         rec, res = run_worker(f"{WORK}/pandas_worker.py", {"mode": "w123", "size": sz, "path": DATA[sz]["path"]}, f"pandas_{sz}")
         MEM.append({**rec, "engine": "pandas", "size": sz, "rows": DATA[sz]["rows"]}); RESULTS.append(res)
-        if rec["status"] != "ok":
-            pandas_oom = True
-            rec, res = run_worker(f"{WORK}/spark_worker.py", {**SPARK_ARGS, "mode": "w123", "size": sz, "path": DATA[sz]["path"]}, f"spark_{sz}")
-            MEM.append({**rec, "engine": "spark", "size": sz, "rows": DATA[sz]["rows"]}); RESULTS.append(res)
-            break
+        pandas_oom = rec["status"] != "ok"
+        rec, res = run_worker(f"{WORK}/spark_worker.py", {**SPARK_ARGS, "mode": "w123", "size": sz, "path": DATA[sz]["path"]}, f"spark_{sz}")
+        MEM.append({**rec, "engine": "spark", "size": sz, "rows": DATA[sz]["rows"]}); RESULTS.append(res)
         shutil.rmtree(DATA[sz]["path"], ignore_errors=True)
+        if pandas_oom:
+            break
 
 # %% [markdown]
 # ## 5. Kết quả: thời gian, RAM, điểm Pandas hết bộ nhớ, kiểm tra hai engine ra cùng kết quả
@@ -525,6 +534,11 @@ if rp and rs:
         x, y = rp["results"]["W3"][k], rs["results"]["W3"][k]
         eq[f"W3_{k}_rel_diff"] = abs(x - y) / max(1e-12, abs(x))
     eq["W3_top_equal"] = sorted(map(lambda r: (r[0], r[1]), rp["results"]["W3"]["top"])) == sorted(map(lambda r: (r[0], r[1]), rs["results"]["W3"]["top"]))
+if eq:
+    eq["all_equal"] = bool((eq.get("W1_max_abs_diff") is not None and eq["W1_max_abs_diff"] < 1e-6) and eq["W2_equal"] and eq["W3_top_equal"]
+                           and eq["W3_oe_sum_rel_diff"] < 1e-9 and max(eq["W3_lender_sd_rel_diff"], eq["W3_msa_sd_rel_diff"]) < 1e-6)
+    if not eq["all_equal"]:
+        print("CẢNH BÁO: Pandas và Spark KHÔNG ra cùng kết quả ở 100%, không dùng được số đo thời gian này")
 print("So kết quả ở 100%:", eq)
 json.dump({"env": ENV, "sizes": DATA, "equality_100pct": eq,
            "pandas_oom": oom[["size", "rows", "peak_rss_gb", "stage", "seconds"]].to_dict("records")},

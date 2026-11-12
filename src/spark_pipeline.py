@@ -112,6 +112,10 @@ V, TH, G = R["variables"], R["thresholds"], R["geography"]
 LT_NAME, LP_NAME = R["codes"]["loan_type"], R["codes"]["loan_purpose"]
 UNIVERSE = list(G["universe_states"])
 KEY = {"rules_version": str(R["version"]), "engine": "spark", "spark_init_s": SPARK_INIT_S}
+import platform
+KEY["env_spark_notebook"] = (f"python {platform.python_version()}; pyspark {spark.version}; numpy {np.__version__}; "
+                             f"pandas {pd.__version__}; java {spark.sparkContext._jvm.System.getProperty('java.version')}")
+print(KEY["env_spark_notebook"])
 CHECKS = []
 
 
@@ -126,7 +130,9 @@ def exp_value(path):
 
 def check(label, value, path=None):
     ev, st, tol = exp_value(path) if path else (None, None, None)
-    ok = None if (ev is None or value is None or st == "pending") else (abs(float(value) - float(ev)) <= tol * max(1.0, abs(float(ev))))
+    # tol là sai số TƯƠNG ĐỐI (như ghi trong expected.yaml); kỳ vọng bằng 0 thì so tuyệt đối
+    ok = None if (ev is None or value is None or st == "pending") else (
+        abs(float(value) - float(ev)) <= tol * (abs(float(ev)) if float(ev) != 0 else 1.0))
     CHECKS.append({"check": label, "value": value, "expected": ev, "expected_status": st, "match": ok})
     flag = "" if ok is None else ("  OK" if ok else "  <-- LỆCH")
     print(f"  {label:<44} {value!s:>16}   kỳ vọng {ev!s:>12} ({st}){flag}")
@@ -149,6 +155,18 @@ def spearman(x, y):
     x, y = pd.Series(x).reset_index(drop=True), pd.Series(y).reset_index(drop=True)
     m = x.notna() & y.notna()
     return float(x[m].rank(method="average").corr(y[m].rank(method="average")))
+
+
+def occupancy_table(occ):
+    """Tỷ lệ hồ sơ không phải nơi ở chính theo loan_type, trên các hồ sơ đã qua mọi bước lọc trước bước nơi ở chính."""
+    pr_ = next(f["equals"] for f in R["samples"]["core_filters"] if f["step"] == "principal_residence")
+    occ = occ.assign(loan_type=occ["loan_type"].astype(str), occupancy_type=occ["occupancy_type"].astype(str))
+    t = occ.groupby("loan_type")["n"].sum().rename("n_before_filter").to_frame()
+    t["n_non_principal"] = (occ[occ["occupancy_type"] != pr_].groupby("loan_type")["n"].sum()
+                            .reindex(t.index).fillna(0).astype("int64"))
+    t["share_non_principal"] = t["n_non_principal"] / t["n_before_filter"]
+    t.insert(0, "type", [LT_NAME.get(k, k) for k in t.index])
+    return t.reset_index().sort_values("loan_type").reset_index(drop=True)
 
 
 def show():
@@ -176,6 +194,8 @@ for f in FILT:
     col = F.col(f["column"])
     if f["step"] == "closed_end":
         open_end_exempt_expr = F.sum((acc & (col == "1111")).cast("long")).alias("open_end_exempt_removed")
+    if f["step"] == "principal_residence":
+        before_occ = acc                      # hồ sơ qua mọi bước lọc trước bước nơi ở chính
     acc = acc & (col.isin(f["in"]) if "in" in f else (col == f["equals"]))
     conds.append(F.sum(acc.cast("long")).alias(f["step"]))
 sc_exprs = [F.sum((F.col(f) == code).cast("long")).alias(f"{f}||{code}") for f in DQ["fields"] for code in DQ["codes"]]
@@ -199,6 +219,8 @@ n_dup = 0
 if RUN_DUPLICATES:
     n_dup = int(raw.select(F.xxhash64(*ALLCOLS).alias("h")).groupBy("h").count()
                 .agg(F.sum(F.col("count") - 1)).first()[0] or 0)
+occ = (raw.filter(before_occ).groupBy("loan_type", "occupancy_type").count().toPandas()
+       .rename(columns={"count": "n"}))
 core = raw.filter(acc)
 print(f"đọc {n_all:,} dòng, core {step_counts[FILT[-1]['step']]:,} | trùng {n_dup:,} | {time.time() - t0:.0f}s")
 
@@ -230,22 +252,15 @@ def band(col, spec, cuts=None):
     return expr
 
 
-def map_flag(colname, mapping):
-    m = {k: v for k, v in mapping.items() if v is not None}
-    return mapper({k: int(v) for k, v in m.items()})[F.col(colname)].cast("int")
-
-
 D, L = V["debt_to_income_ratio"], V["combined_loan_to_value_ratio"]
 CUT = V["loan_to_income"]["cut_exact"]
-RSV, IRV, LTV_, TCV = (V["rate_spread"]["valid_range"], V["interest_rate"]["valid_range"],
-                       V["loan_term"]["valid_range"], V["total_loan_costs"]["valid_range"])
+RSV = V["rate_spread"]["valid_range"]
 S_ = R["sampling"]
 dti_map = mapper({str(k): int(v) for k, v in D["ordinal_map"].items()})
 act = F.col("action_taken")
 inc, amt = to_num("income"), to_num("loan_amount")
 cltv = to_num("combined_loan_to_value_ratio")
 tract = to_num("tract_to_msa_income_percentage")
-sub, pay = F.col("submission_of_application"), F.col("initially_payable_to_institution")
 
 feat = (core
   .withColumn("decisioned", act.isin(R["samples"]["decisioned"]["action_taken_in"]))
@@ -261,20 +276,10 @@ feat = (core
   .withColumn("lti", F.when(F.col("income_num") > 0, F.col("loan_amount_num") / (1000 * F.col("income_num"))))
   .withColumn("tract_ratio", F.when(tract != 0, tract) if V["lmi_tract"]["zero_means_missing"] else tract)
   .withColumn("lmi", F.col("tract_ratio") < V["lmi_tract"]["lmi_if_below"])
-  .withColumn("jumbo", map_flag("conforming_loan_limit", V["jumbo"]["values"]))
-  .withColumn("broker", map_flag("submission_of_application", V["broker"]["values"]))
-  .withColumn("channel3", F.when(sub.isin("3", "1111") | pay.isin("3", "1111"), F.lit(None).cast("string"))
-                           .when(pay == "2", "third_party").when((sub == "1") & (pay == "1"), "retail")
-                           .when((sub == "2") & (pay == "1"), "broker"))
   .withColumn("rs_num", to_num("rate_spread"))
   .withColumn("rs_valid", F.coalesce((F.col("rs_num") >= RSV["ge"]) & (F.col("rs_num") <= RSV["le"]), F.lit(False)))
   .withColumn("rs_out_of_range", F.col("rs_num").isNotNull() & ~F.col("rs_valid"))
-  .withColumn("ir_num", to_num("interest_rate"))
-  .withColumn("ir_valid", F.coalesce((F.col("ir_num") >= IRV["ge"]) & (F.col("ir_num") <= IRV["le"]), F.lit(False)))
   .withColumn("term_num", to_num("loan_term"))
-  .withColumn("term_valid", F.coalesce((F.col("term_num") > LTV_["gt"]) & (F.col("term_num") <= LTV_["le"]), F.lit(False)))
-  .withColumn("tlc_num", to_num("total_loan_costs"))
-  .withColumn("tlc_valid", F.coalesce(F.col("tlc_num") >= TCV["ge"], F.lit(False)))
   .withColumn("in_universe", F.col("state_code").isin(UNIVERSE))
   .withColumn("state_missing", F.col("state_code").isin(G["missing_values"]))
   .withColumn("county_valid", F.coalesce(F.col("county_code").rlike(G["county_code_format"]), F.lit(False)))
@@ -293,13 +298,7 @@ feat = (feat
   .withColumn("usable", F.col("decisioned") & F.col("dti_ordinal").isNotNull() & F.col("cltv_valid")
                         & F.coalesce(F.col("income_num") > 0, F.lit(False)))
   .withColumn("pricing", F.col("orig") & F.col("rs_valid"))
-  .withColumn("cost_share", F.when(F.col("pricing") & F.col("tlc_valid") & (F.col("loan_amount_num") > 0),
-                                   F.col("tlc_num") / F.col("loan_amount_num")))
 )
-r_m, n_m = F.col("ir_num") / 1200, F.col("term_num")
-pay_m = F.when(r_m == 0, F.col("loan_amount_num") / n_m).otherwise(F.col("loan_amount_num") * r_m / (1 - F.pow(1 + r_m, -n_m)))
-feat = feat.withColumn("pti", F.when(F.col("pricing") & F.col("ir_valid") & F.col("term_valid") & (F.col("income_num") > 0),
-                                     pay_m / (1000 * F.col("income_num") / 12)))
 
 RAW_KEEP = ["row_id", "lei", "state_code", "county_code", "action_taken", "loan_type", "loan_purpose", "rate_spread",
             "income", "loan_amount"]
@@ -368,6 +367,10 @@ KEY.update({"all_records": n_all, "core": n_core, "decisioned": n_dec, "usable":
             "pricing_usable": n_pricing_u, "duplicates": n_dup, "rs_out_of_range": rs_row["out"]})
 
 save(dq, "dq_special_codes")
+occ_t = occupancy_table(occ)
+save(occ_t, "dq_occupancy_by_type")
+KEY.update({f"occupancy_non_principal_share_{r_.type}": float(r_.share_non_principal) for r_ in occ_t.itertuples()})
+print(occ_t.round(4).to_string(index=False))
 save(fprof, "dq_field_profile")
 dq_rows = [
     {"item": "exact duplicate rows (99 fields, all records)", "n": n_dup},
@@ -889,6 +892,9 @@ for it in range(100):
     lab_l, lab_m = new_l.localCheckpoint(), new_m.localCheckpoint()
     if changed == 0:
         break
+else:
+    print("CẢNH BÁO: lan truyền nhãn chưa hội tụ sau 100 vòng, số thành phần liên thông có thể sai")
+KEY["twoway_label_propagation_converged"] = bool(changed == 0)
 comp_sizes = TW.join(lab_l, "lei").groupBy("lab").count().orderBy(F.desc("count")).collect()
 big_lab = comp_sizes[0]["lab"]
 CS = TW.join(lab_l.filter(F.col("lab") == big_lab).select("lei"), "lei").cache()
@@ -1070,10 +1076,22 @@ if pd_oof:
     g2 = JO.join(F.broadcast(L767_DF), "lei").groupBy("lei").agg(F.sum("y").alias("O"), F.sum("p_lr").alias("E_lr"), F.sum("p_gbt").alias("E_gbt")).toPandas().set_index("lei")
     for m_ in ["lr", "gbt"]:
         LOCMP[f"oe_{m_}"] = (g2["O"] / g2[f"E_{m_}"]).reindex(LOCMP.index)
-        KEY[f"pred_spearman_cells_vs_{m_}"] = spearman(LOCMP["oe_cells"], LOCMP[f"oe_{m_}"])
+        # Tên khóa khác bên Pandas: số này tính từ xác suất của Pandas nên không phải kết quả độc lập để so hai engine
+        KEY[f"pred_spearman_cells_vs_{m_}_pandas_oof"] = spearman(LOCMP["oe_cells"], LOCMP[f"oe_{m_}"])
     if RUN_MLLIB:
-        cmpp = OOF.join(PO, "row_id").agg(F.corr("p_lr_mllib", "p_lr").alias("r"), F.max(F.abs(F.col("p_lr_mllib") - F.col("p_lr"))).alias("mx")).first()
+        dif = (OOF.join(PO, "row_id").join(UE.select("row_id", "loan_purpose"), "row_id")
+                  .withColumn("ad", F.abs(F.col("p_lr_mllib") - F.col("p_lr"))).cache())
+        cmpp = dif.agg(F.corr("p_lr_mllib", "p_lr").alias("r"), F.max("ad").alias("mx"), F.avg("ad").alias("mean"),
+                       F.avg((F.col("ad") > 0.05).cast("double")).alias("gt05")).first()
         KEY["pred_corr_mllib_vs_sklearn_lr"], KEY["pred_maxdiff_mllib_vs_sklearn_lr"] = cmpp["r"], cmpp["mx"]
+        KEY["pred_meanabsdiff_mllib_vs_sklearn_lr"], KEY["pred_share_absdiff_gt_0p05_mllib_vs_sklearn_lr"] = cmpp["mean"], cmpp["gt05"]
+        byp = (dif.groupBy("loan_purpose").agg(F.count(F.lit(1)).alias("n"), F.avg("ad").alias("mean_abs_diff"),
+                                               F.max("ad").alias("max_abs_diff"),
+                                               F.sum((F.col("ad") > 0.05).cast("long")).alias("n_abs_diff_gt_0p05"))
+                  .toPandas().sort_values("loan_purpose"))
+        byp.insert(1, "purpose", [LP_NAME.get(str(x), str(x)) for x in byp["loan_purpose"]])
+        save(byp, "pred_mllib_vs_sklearn_by_purpose")
+        print(byp.round(4).to_string(index=False))
 save(LOCMP.reset_index(), "pred_lender_oe_comparison_spark")
 print(f"dự đoán (Spark) xong | {time.time() - t0:.0f}s")
 

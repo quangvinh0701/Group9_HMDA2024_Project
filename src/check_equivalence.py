@@ -19,6 +19,7 @@ import pandas as pd
 
 TOL = 1e-9          # sai số tương đối cho trung bình, tỷ lệ, tổng
 TOL_ITER = 1e-6     # mô hình hai chiều (vòng lặp)
+ABS_FLOOR = 1e-15   # hai số lệch nhau dưới mức này coi là bằng nhau (nhiễu số thực quanh 0)
 
 
 def locate(engine):
@@ -48,11 +49,14 @@ def num(s):
 
 
 def rel(a, b):
+    """Sai lệch tương đối |a - b| / max(|a|, |b|); hai số cùng thiếu hoặc lệch dưới ABS_FLOOR thì bằng 0."""
     if pd.isna(a) and pd.isna(b):
         return 0.0
     if pd.isna(a) or pd.isna(b):
         return np.inf
-    return abs(a - b) / max(1.0, abs(a), abs(b)) if max(abs(a), abs(b)) >= 1 else abs(a - b)
+    if abs(a - b) <= ABS_FLOOR:
+        return 0.0
+    return abs(a - b) / max(abs(a), abs(b))
 
 
 details, summary = [], []
@@ -70,8 +74,8 @@ def compare(name, quantity, keys, exact=(), approx=(), report_only=(), tol=TOL):
     for col in list(exact) + list(approx):
         x, y = num(both[f"{col}_pd"]), num(both[f"{col}_sp"])
         for k_, xv, yv in zip(both[keys].astype(str).agg("|".join, axis=1), x, y):
-            d = 0.0 if (col in exact and xv == yv) else rel(xv, yv)
-            ok = (xv == yv) if col in exact else d <= tol
+            d = rel(xv, yv)
+            ok = (d == 0.0 and (xv == yv or (pd.isna(xv) and pd.isna(yv)))) if col in exact else d <= tol   # exact: cùng thiếu cũng là khớp
             details.append({"output": name, "key": k_, "column": col, "pandas": xv, "spark": yv, "rel_diff": d, "agree": ok})
             n_vals += 1; worst = max(worst, d if np.isfinite(d) else 1e9); bad += (not ok)
     for col in report_only:
@@ -103,17 +107,20 @@ compare("eq_6_top50_lenders", "(6) Aggregates of the 50 largest lenders", ["rank
 
 # sai số của percentile_approx so với trung vị chính xác (chỉ bên Spark có)
 sp4 = read(SP_DIR, "eq_4_amounts_by_loan_type")
-ap = [rel(x, y) for x, y in zip(num(sp4["median_exact"]), num(sp4["median_approx"]))]
+pairs_ = [(x, y) for x, y in zip(num(sp4["median_exact"]), num(sp4["median_approx"])) if not (pd.isna(x) or pd.isna(y))]
+ap = [rel(x, y) for x, y in pairs_]
+ap_abs = [abs(x - y) for x, y in pairs_]
 summary.append({"Quantity": "(4) percentile_approx vs exact median (Spark)", "Values compared": len(ap), "Agree": True,
                 "Max relative difference": max(ap) if ap else np.nan,
-                "Explanation": f"chỉ báo cáo: percentile_approx lệch tối đa {max(ap):.2e} so với percentile chính xác" if ap else ""})
+                "Explanation": (f"chỉ báo cáo: percentile_approx lệch tương đối tối đa {max(ap):.2e} "
+                                f"(tuyệt đối tối đa {max(ap_abs):.2e}) so với percentile chính xác") if ap else ""})
 
 # key_numbers.json
 kp = json.load(open(os.path.join(PD_DIR, "key_numbers.json"), encoding="utf-8"))
 ks = json.load(open(os.path.join(SP_DIR, "key_numbers.json"), encoding="utf-8"))
 SKIP = {"engine", "runtime_s", "spark_init_s", "rules_version"}
 shared = sorted((set(kp) & set(ks)) - SKIP)
-n_bad, worst = 0, 0.0
+n_bad, worst, worst_key = 0, 0.0, None
 for k in shared:
     a, b = kp[k], ks[k]
     if a is None or b is None or isinstance(a, (str, bool)) or isinstance(b, (str, bool)):
@@ -121,10 +128,13 @@ for k in shared:
     else:
         d = rel(float(a), float(b)); ok = d <= (TOL_ITER if k.startswith("twoway_") else TOL)
     details.append({"output": "key_numbers", "key": k, "column": "value", "pandas": a, "spark": b, "rel_diff": d, "agree": ok})
-    n_bad += (not ok); worst = max(worst, d if np.isfinite(d) else 1e9)
+    n_bad += (not ok)
+    if (d if np.isfinite(d) else 1e9) > worst:
+        worst, worst_key = (d if np.isfinite(d) else 1e9), k
 summary.append({"Quantity": "Key analysis numbers (SQ1-SQ4, two-way, HHI)", "Values compared": len(shared), "Agree": n_bad == 0,
                 "Max relative difference": worst,
                 "Explanation": ("khớp trong dung sai" if n_bad == 0 else f"LỆCH {n_bad} số") +
+                               f"; lệch lớn nhất ở khóa {worst_key}" +
                                f"; khóa chỉ có một bên: {sorted((set(kp) ^ set(ks)) - SKIP)[:8]}"})
 if kp.get("rules_version") != ks.get("rules_version"):
     summary.append({"Quantity": "rules.yaml version", "Values compared": 1, "Agree": False, "Max relative difference": np.nan,

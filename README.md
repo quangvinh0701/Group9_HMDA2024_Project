@@ -139,7 +139,7 @@ The copies in `config/` are byte-identical to the ones used in the v2 Kaggle run
 
 ### Where each part of the report comes from
 
-| Report item | Result files (in `results/pandas/`, with the same names in `results/spark/`, unless a folder is given) |
+| Report item | Result files (in `results/pandas/` unless a folder is given; the PySpark run writes the same names to `results/spark/`, see section 9) |
 |---|---|
 | Table 1, data quality | `dq_summary.csv`, `dq_special_codes.csv`, `dq_missing_by_action.csv`, `dq_field_profile.csv` |
 | Table 2 and Figure 1, products | `sq1_outcomes_by_type.csv`, `sq1_loan_amount_originated_by_type.csv`, `sq2_rate_spread_by_type.csv`, `sq1_denial_type_x_purpose.csv` |
@@ -150,7 +150,7 @@ The copies in `config/` are byte-identical to the ones used in the v2 Kaggle run
 | Figure 3 and lender results | `sq4_lender_oe.csv`, `sq4_oe_by_agency.csv`, `sq4_two_way.csv`, `sq4_sensitivity.csv`, `sq4_spread_dispersion.csv`, `sq4_hhi_msa.csv` |
 | Tables 5 and 6, correctness | `results/equivalence/equivalence_summary.csv`, `equivalence_details.csv` |
 | Table 7, Figure 4, Table 12, performance | `results/perf/perf_summary.csv`, `perf_memory.csv`, `perf_runs.csv` |
-| Table 8, prediction | `results/pandas/pred_metrics.csv`, `pred_lender_oe_comparison.csv`, `pred_calibration_deciles.csv`; MLlib version in `results/spark/pred_lender_oe_comparison_spark.csv` and `key_numbers.json` |
+| Table 8, prediction | `results/pandas/pred_metrics.csv`, `pred_lender_oe_comparison.csv`, `pred_calibration_deciles.csv`; MLlib version in `results/spark/key_numbers.json` and `pred_mllib_vs_sklearn_by_purpose.csv` |
 | Single numbers quoted in the text | `key_numbers.json` |
 
 ## 6. Checking that Pandas and PySpark agree
@@ -180,17 +180,17 @@ after one warm-up. Spark session start, cache building, cached and uncached runs
 
 ## 8. Which run produced the files in `results/`
 
-All results come from the v2 run (rules 1.1, code as in `src/`, Kaggle, 15 November 2026), with one exception.
-The v2 Pandas outputs are byte-identical to those of the first run except for `checks_vs_expected.csv`,
-`key_numbers.json` and the new `dq_occupancy_by_type.csv`. The v2 PySpark outputs differ from the first run's only in
-the last digits of floating-point sums, which change with the order of Spark's partial aggregations; for those files
-`results/spark/` keeps the first run's copies, and only `checks_vs_expected.csv`, `key_numbers.json`,
-`dq_occupancy_by_type.csv` and `pred_mllib_vs_sklearn_by_purpose.csv` are from v2. `results/equivalence/` is computed
-from the files in this folder. The five files in `results/perf/` were checked against the md5 sums printed in the
-Kaggle log.
+Every file in `results/` comes from the v2 run (rules 1.1, code as in `src/`, Kaggle, 15 November 2026). The files
+were copied from the Kaggle outputs and each was checked against the md5 sum computed on Kaggle.
+`results/equivalence/` is recomputed from `results/pandas/` and `results/spark/` with `src/check_equivalence.py`;
+its three files have the same md5 sums as the output of the equivalence notebook on Kaggle.
 
 ## 9. What is not included
 
 - The raw data (see section 2).
+- Five per-lender, per-county and per-MSA tables of the PySpark run (`sq4_lender_oe.csv`, `sq3_county_oe_display.csv`,
+  `sq4_two_way_lender_effects.csv`, `sq4_two_way_msa_effects.csv`, `pred_lender_oe_comparison_spark.csv`, together
+  about 500 KB). The report uses the Pandas versions in `results/pandas/`; the Spark values enter the comparison
+  through `key_numbers.json` and `eq_6_top50_lenders.csv`. They are in the output of the PySpark notebook on Kaggle.
 - Two per-record prediction files (`pred_oof.parquet`, about 85 MB, and its MLlib counterpart, about 50 MB); the
   pipelines write them again when run.

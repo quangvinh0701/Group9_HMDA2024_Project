@@ -25,8 +25,9 @@ src/
   py_to_ipynb.py               converts the .py files (with "# %%" cell markers) to notebooks
   gen_synth.py                 synthetic file with the HMDA schema, used to test the code before the real run
   columns.txt                  the 99 field names in file order, read by gen_synth.py
-notebooks/                     the five v2 notebooks run on Kaggle on 15 November 2026 (code cells identical to src/,
-                               saved without outputs; the executed copies with outputs are on Kaggle)
+notebooks/                     the v2 notebooks as executed on Kaggle on 15 November 2026, with all cell outputs
+                               (pandas, pyspark, performance, check_equivalence; downloaded from Kaggle unchanged);
+                               their code cells are identical to src/. HMDA_v2_convert holds the code of step 0
   v1_executed/                 the four notebooks of the first run (7 November 2026) with all cell outputs;
                                their code is the pre-review version, kept for reference
 results/

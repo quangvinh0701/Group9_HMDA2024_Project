@@ -25,11 +25,9 @@ src/
   py_to_ipynb.py               converts the .py files (with "# %%" cell markers) to notebooks
   gen_synth.py                 synthetic file with the HMDA schema, used to test the code before the real run
   columns.txt                  the 99 field names in file order, read by gen_synth.py
-notebooks/                     the v2 notebooks as executed on Kaggle on 15 November 2026, with all cell outputs
+notebooks/                     the notebooks as executed on Kaggle on 15 November 2026, with all cell outputs
                                (pandas, pyspark, performance, check_equivalence; downloaded from Kaggle unchanged);
-                               their code cells are identical to src/. HMDA_v2_convert holds the code of step 0
-  v1_executed/                 the four notebooks of the first run (7 November 2026) with all cell outputs;
-                               their code is the pre-review version, kept for reference
+                               their code cells are identical to src/. HMDA_convert holds the code of step 0
 results/
   pandas/, spark/              all result tables of the two pipelines, including eq_*.csv and key_numbers.json
   equivalence/                 comparison of the two (summary and every compared value)
@@ -99,7 +97,7 @@ Optional switches of the performance script: `PERF_SIZES` (for example `10%,25%,
 
 1. Create three datasets: the Parquet file (`hmda-2024-one-year-raw`), the two files of `config/` (`hmda-config`),
    and the original LAR CSV and Transmittal Sheet imported from the FFIEC links (`hmda-2024-ffiec-files`).
-2. Upload the notebooks of `notebooks/` (`HMDA_v2_convert` first, to write the Parquet file), add the datasets as
+2. Upload the notebooks of `notebooks/` (`HMDA_convert` first, to write the Parquet file), add the datasets as
    input, accelerator none, internet off, Run All.
 3. For the equivalence notebook, add the outputs of the Pandas and PySpark notebooks as input.
 
@@ -136,7 +134,7 @@ files), to `$HMDA_WORK/clean_core`. It is rebuilt from the raw Parquet file and 
 stored here; the Pandas pipeline builds the same table in memory.
 
 All definitions are in `config/rules.yaml`, which both pipelines read, so the cleaning rules are identical by construction.
-The copies in `config/` are byte-identical to the ones used in the v2 Kaggle run.
+The copies in `config/` are byte-identical to the ones used in the Kaggle run.
 
 ### Where each part of the report comes from
 
@@ -161,13 +159,13 @@ profile and every key number both pipelines write to `key_numbers.json`. Counts 
 within 1e-9 and results of the iterative two-way model within 1e-6 (the difference is divided by the larger magnitude
 when that exceeds one, and taken as is below one). Result for the files in this
 folder: 1,684 values agree, largest relative difference 2.5e-12 (`results/equivalence/equivalence_summary.md`).
-The same comparison run on Kaggle against the v2 outputs also found every value in agreement.
+The same comparison run on Kaggle also found every value in agreement.
 
 ## 7. Performance experiment
 
 `src/perf_pipeline.py` builds a 15-column table of the core sample, samples it at 10, 25, 50 and 100% and replicates
 it 2, 4 and 8 times, then keeps doubling (16, 32, 64 times) until the Pandas run is stopped (replicas are used only
-for this benchmark). In the v2 run Pandas completed 16 times (92.4 million rows, 24.2 GB) and was stopped while
+for this benchmark). In the Kaggle run Pandas completed 16 times (92.4 million rows, 24.2 GB) and was stopped while
 loading the 32-times table (184.8 million rows); Spark completed every size. W0 reads the original CSV with Pandas in
 three ways (C and PyArrow parsers with all fields as strings, and PyArrow with Arrow-backed types) and with Spark. Each engine and size runs in its own process;
 the parent process samples memory every 0.2 s and stops a run at 90% of RAM. Each measure is the median of five runs
@@ -181,7 +179,7 @@ after one warm-up. Spark session start, cache building, cached and uncached runs
 
 ## 8. Which run produced the files in `results/`
 
-Every file in `results/` comes from the v2 run (rules 1.1, code as in `src/`, Kaggle, 15 November 2026). The files
+Every file in `results/` comes from one Kaggle run (rules 1.1, code as in `src/`, Kaggle, 15 November 2026). The files
 were copied from the Kaggle outputs and each was checked against the md5 sum computed on Kaggle.
 `results/equivalence/` is recomputed from `results/pandas/` and `results/spark/` with `src/check_equivalence.py`;
 its three files have the same md5 sums as the output of the equivalence notebook on Kaggle.

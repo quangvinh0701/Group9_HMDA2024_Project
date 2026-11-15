@@ -2,10 +2,10 @@
 Build figures, tables and number macros for the HMDA 2024 report.
 
 Every number printed in the report comes from the Kaggle run outputs:
-  results/pandas       (HMDA v1 pandas, Version 1)
-  results/spark        (HMDA v1 pyspark, Version 1)
-  results/perf         (HMDA v1 performance, Version 1)
-  results/equivalence  (HMDA v1 check equivalence, Version 1)
+  results/pandas       (Pandas notebook)
+  results/spark        (PySpark notebook)
+  results/perf         (performance notebook)
+  results/equivalence  (equivalence notebook)
   results/external     (FFIEC Data Browser counts, verification only)
 
 Usage: python build_report_assets.py RESULTS_DIR OUT_DIR

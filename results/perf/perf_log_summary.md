@@ -1,4 +1,4 @@
-# HMDA v2 performance, Kaggle run (2026-11-15)
+# HMDA performance experiment, Kaggle run (2026-11-15)
 
 Môi trường: 4 CPU, RAM 32.2 GB, ngân sách 29.0 GB; pandas 2.3.3, pyarrow 23.0.1, pyspark 4.0.4, Python 3.13.18, rules 1.1.
 Thời gian chạy notebook: 3646 s. W0 đọc CSV gốc FFIEC (4.64 GB, 99 cột); Parquet thô 0.61 GB.

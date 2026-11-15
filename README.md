@@ -34,7 +34,8 @@ results/
   perf/                        timings of every run, medians, peak memory, environment
   external/                    counts from the official HMDA Data Browser, used only to verify our read of the file
 figures/
-  pandas/, perf/               figures written by the notebooks
+  pandas/                      figures written by the Pandas notebook
+  perf/                        figures of the performance notebook, redrawn from results/perf with its plotting code
 report/                        LaTeX source of the report (compile main.tex with XeLaTeX);
                                report/figures/ and report/tables/ are generated from results/ by step 5
 ```
@@ -95,10 +96,10 @@ Optional switches of the performance script: `PERF_SIZES` (for example `10%,25%,
 
 ### Steps 1 to 4 on Kaggle (how the results here were produced)
 
-1. Create three datasets: the Parquet file (`hmda-2024-one-year-raw`), the two files of `config/` (`hmda-config`),
-   and the original LAR CSV and Transmittal Sheet imported from the FFIEC links (`hmda-2024-ffiec-files`).
-2. Upload the notebooks of `notebooks/` (`HMDA_convert` first, to write the Parquet file), add the datasets as
-   input, accelerator none, internet off, Run All.
+1. Create two datasets: the two files of `config/` (`hmda-config`), and the original LAR CSV and Transmittal Sheet
+   imported from the FFIEC links (`hmda-2024-ffiec-files`).
+2. Run `HMDA_convert` first; it writes the Parquet file. Then upload the other notebooks of `notebooks/`, add the two
+   datasets and the output of `HMDA_convert` as input, accelerator none, internet off, Run All.
 3. For the equivalence notebook, add the outputs of the Pandas and PySpark notebooks as input.
 
 ### Step 5: rebuild the report
@@ -156,8 +157,8 @@ The copies in `config/` are byte-identical to the ones used in the Kaggle run.
 
 `src/check_equivalence.py` compares six required outputs (`eq_1` to `eq_6` in each results folder), the full field
 profile and every key number both pipelines write to `key_numbers.json`. Counts must match exactly, means and rates
-within 1e-9 and results of the iterative two-way model within 1e-6 (the difference is divided by the larger magnitude
-when that exceeds one, and taken as is below one). Result for the files in this
+within 1e-9 and results of the iterative two-way model within 1e-6 (relative difference |a - b| / max(|a|, |b|);
+differences below 1e-15 count as zero). Result for the files in this
 folder: 1,684 values agree, largest relative difference 2.5e-12 (`results/equivalence/equivalence_summary.md`).
 The same comparison run on Kaggle also found every value in agreement.
 

@@ -105,7 +105,8 @@ Optional switches of the performance script: `PERF_SIZES` (for example `10%,25%,
 ### Step 5: rebuild the report
 
 ```
-HMDA_STYLE=acm python src/build_report_assets.py results report
+HMDA_STYLE=acm python src/build_report_assets.py results report          # the results stored in this folder
+HMDA_STYLE=acm python src/build_report_assets.py output/results report   # or the results of your own run (steps 1 to 4)
 cd report && xelatex main && bibtex main && xelatex main && xelatex main
 ```
 
@@ -126,6 +127,12 @@ counts or the two engines disagree. Running it on this folder reproduces `report
 5. **Analysis.** Outcomes by product (SQ1); DTI jump test, low-DTI diagnostic, Kitagawa decomposition, pricing (SQ2);
    observed/expected ratios for states, MSAs and LMI tracts (SQ3); lender dispersion, two-way lender and MSA effects,
    concentration (SQ4); optional denial model with lender-grouped five-fold cross-fitting.
+
+**Prepared analytical data.** The PySpark pipeline writes the core sample with the row identifier, nine raw fields
+kept as published and all derived fields typed (doubles, booleans, string labels) as Parquet, partitioned by
+`state_code` (55 values, the key of the geographic aggregations; county, with over 3,000 values, would give many small
+files), to `$HMDA_WORK/clean_core`. It is rebuilt from the raw Parquet file and the rules on every run, so it is not
+stored here; the Pandas pipeline builds the same table in memory.
 
 All definitions are in `config/rules.yaml`, which both pipelines read, so the cleaning rules are identical by construction.
 The copies in `config/` are byte-identical to the ones used in the v2 Kaggle run.

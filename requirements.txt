@@ -1,4 +1,5 @@
-# Versions of the Kaggle session that produced the results (Python 3.13, 6-7 November 2026).
+# Versions of the Kaggle session that produced the results (Python 3.13; v2 run, 15 November 2026,
+# same package versions as the first run on 6-7 November).
 # PySpark 4.0 also needs Java 17 or 21 on the machine (the Kaggle image ships Java 21).
 pandas==2.3.3
 pyarrow==23.0.1

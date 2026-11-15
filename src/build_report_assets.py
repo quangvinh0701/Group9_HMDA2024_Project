@@ -121,6 +121,12 @@ for k, n in [("all_records", "nAll"), ("applications", "nApps"), ("first_lien", 
              ("usable", "nUsable"), ("pricing", "nPricing"), ("pricing_usable", "nPricingUsable")]:
     mac(n, fmt_int(eq1[k]))
 mac("shareUsable", pct(eq1["usable"] / eq1["decisioned"]))
+occ = rd(os.path.join(P, "dq_occupancy_by_type.csv")).set_index("type")
+_occ_s = rd(os.path.join(S, "dq_occupancy_by_type.csv")).set_index("type")
+assert (occ[["n_before_filter", "n_non_principal"]] == _occ_s.loc[occ.index, ["n_before_filter", "n_non_principal"]]).all().all()
+assert occ["n_non_principal"].sum() == eq1["site_built_1_4_unit"] - eq1["principal_residence"]
+mac("occConv", pct(occ.loc["conventional", "share_non_principal"]))
+mac("occGovMax", pct(occ.loc[["FHA", "VA", "USDA"], "share_non_principal"].max(), 2))
 mac("nNonPrincipal", fmt_int(eq1["site_built_1_4_unit"] - eq1["principal_residence"]))
 mac("shareNonPrincipal", pct(1 - eq1["principal_residence"] / eq1["site_built_1_4_unit"]))
 mac("nDup", fmt_int(kp["duplicates"]))
@@ -268,6 +274,8 @@ mac("stateLowName", st.iloc[0].state_code); mac("stateLowOE", fmt(st.iloc[0].oe,
 mac("stateHighName", st.iloc[-1].state_code); mac("stateHighOE", fmt(st.iloc[-1].oe, 2))
 mac("fallbackShare", pct(kp["fallback_share"], 2)); mac("nExtCells", fmt_int(kp["n_ext_cells"]))
 mac("minCellN", fmt_int(kp["smallest_cell_n"]))
+_cv = kp["conv_twoway_last_iter_max_change"]
+mac("twLastChange", (f"{_cv:.0e}".replace("e-0", r"\times10^{-").replace("e-", r"\times10^{-") + "}") if _cv > 0 else "0")
 mac("nationalOE", fmt(kp["national_oe"], 4))
 
 # lenders
@@ -306,6 +314,13 @@ mac("brLR", fmt(pm.loc["p_lr", "brier"], 4)); mac("brGB", fmt(pm.loc["p_gbt", "b
 mac("slLR", fmt(pm.loc["p_lr", "calibration_slope"], 3)); mac("slGB", fmt(pm.loc["p_gbt", "calibration_slope"], 3))
 mac("aucMLlib", fmt(ks["pred_mllib_lr_roc_auc"], 3)); mac("corrMLlib", fmt(ks["pred_corr_mllib_vs_sklearn_lr"], 4))
 mac("maxDiffMLlib", fmt(ks["pred_maxdiff_mllib_vs_sklearn_lr"], 2))
+mac("meanDiffMLlib", fmt(ks["pred_meanabsdiff_mllib_vs_sklearn_lr"], 4))
+mac("shareDiffMLlib", pct(ks["pred_share_absdiff_gt_0p05_mllib_vs_sklearn_lr"], 3))
+_bp = rd(os.path.join(S, "pred_mllib_vs_sklearn_by_purpose.csv")).set_index("purpose")
+MLLIB_BY_PURPOSE = _bp
+mac("nDiffMLlib", fmt_int(_bp["n_abs_diff_gt_0p05"].sum()))
+mac("nDiffMLlibNA", fmt_int(_bp.loc["not_applicable", "n_abs_diff_gt_0p05"])); mac("nPurposeNA", fmt_int(_bp.loc["not_applicable", "n"]))
+mac("maxDiffMLlibOther", fmt(_bp.drop(index="not_applicable")["max_abs_diff"].max(), 3))
 mac("rhoPredLR", fmt(kp["pred_spearman_cells_vs_lr"], 3)); mac("rhoPredGB", fmt(kp["pred_spearman_cells_vs_gbt"], 3))
 _cal = rd(os.path.join(P, "pred_calibration_deciles.csv"))
 _c0 = _cal[_cal["model"] == "p_lr"].sort_values("mean_pred").iloc[0]      # lowest decile of the logistic model
@@ -323,8 +338,9 @@ mac("sparkInitMain", fmt(ks["spark_init_s"], 1))
 pmem = rd(os.path.join(PF, "perf_memory.csv"))
 psum = rd(os.path.join(PF, "perf_summary.csv"))
 meta = json.load(open(os.path.join(PF, "perf_meta.json")))
-SIZES = ["10%", "25%", "50%", "100%", "x2", "x4", "x8", "x16"]
+SIZES = list(meta["sizes"])                      # 10% ... x8, then x16, x32 added until Pandas stopped
 rows = {s: meta["sizes"][s]["rows"] for s in SIZES}
+assert meta["equality_100pct"]["all_equal"], "Pandas and Spark must agree at 100% before times are reported"
 
 
 def med(engine, size, measure):
@@ -348,38 +364,78 @@ for s in SIZES:
     m2 = pmem[(pmem.engine == "spark") & (pmem["size"] == s)]
     d["pd_mem"] = m1.peak_rss_gb.iloc[0] if len(m1) else np.nan
     d["pd_status"] = m1.status.iloc[0] if len(m1) else ""
+    d["pd_stage"] = m1.stage.iloc[0] if len(m1) else ""
     d["sp_mem"] = m2.peak_rss_gb.iloc[0] if len(m2) else np.nan
     perf.append(d)
 perf = pd.DataFrame(perf).set_index("size")
 perf.to_csv(os.path.join(OUT, "perf_table_built.csv"))
 oom = meta["pandas_oom"][0]
 assert oom["size"] == SIZES[-1], "largest size in SIZES must be the one where Pandas stopped"
+assert str(oom["stage"]).startswith("load"), "text says Pandas stopped while loading the table"
+LAST = SIZES[-2]                                  # largest size both engines completed
+assert LAST == "x16" and (perf.drop(index=SIZES[-1]).pd_status == "ok").all()
 mac("oomSize", oom["size"].lstrip("x")); mac("oomRows", fmt(oom["rows"] / 1e6, 1)); mac("oomPeak", fmt(oom["peak_rss_gb"], 1))
+mac("oomSecs", fmt(oom["seconds"], 0))
+mac("lastRows", fmt(rows[LAST] / 1e6, 1))
 mac("budget", fmt(meta["env"]["memory_budget_gb"], 0)); mac("ramTotal", fmt(meta["env"]["ram_total_gb"], 1))
 mac("pdMemEight", fmt(perf.loc["x8", "pd_mem"], 1)); mac("spMemEight", fmt(perf.loc["x8", "sp_mem"], 1))
-mac("spMemSixteen", fmt(perf.loc["x16", "sp_mem"], 1)); mac("pdMemFull", fmt(perf.loc["100%", "pd_mem"], 1))
+mac("pdMemSixteen", fmt(perf.loc["x16", "pd_mem"], 1)); mac("spMemSixteen", fmt(perf.loc["x16", "sp_mem"], 1))
+mac("spMemOom", fmt(perf.loc[SIZES[-1], "sp_mem"], 1)); mac("pdMemFull", fmt(perf.loc["100%", "pd_mem"], 1))
 mac("spMemTen", fmt(perf.loc["10%", "sp_mem"], 1)); mac("pdMemTen", fmt(perf.loc["10%", "pd_mem"], 2))
 w0 = pmem[pmem["size"] == "W0"].set_index("label")
+assert w0.loc["pandas_W0_pyarrow", "status"] != "ok" and w0.loc["pandas_W0_c", "status"] != "ok"
+assert w0.loc["pandas_W0_arrow", "status"] == "ok"
 mac("wzPyarrowPeak", fmt(w0.loc["pandas_W0_pyarrow", "peak_rss_gb"], 1))
 mac("wzCPeak", fmt(w0.loc["pandas_W0_c", "peak_rss_gb"], 1))
+mac("wzArrowPeak", fmt(w0.loc["pandas_W0_arrow", "peak_rss_gb"], 1))
+mac("wzArrowTime", fmt(med("pandas", "W0", "W0_arrow"), 1))
 mac("wzSparkPeak", fmt(w0.loc["spark_W0", "peak_rss_gb"], 1))
 mac("wzSparkTime", fmt(med("spark", "W0", "W0_spark"), 1))
 mac("wzSparkInit", fmt(med("spark", "W0", "init"), 1))
+mac("wzCsvGb", fmt(meta["env"]["w0_csv_gb"], 2))
+mac("wzMemRatio", fmt(w0.loc["pandas_W0_arrow", "peak_rss_gb"] / w0.loc["spark_W0", "peak_rss_gb"], 0))
 mac("initMin", fmt(perf.sp_init.min(), 1)); mac("initMax", fmt(perf.sp_init.max(), 1))
-mac("cbFull", fmt(perf.loc["100%", "sp_cache_build"], 1)); mac("cbEight", fmt(perf.loc["x8", "sp_cache_build"], 1))
-mac("pdPerMillion", fmt((perf.loc["x8", "pd_mem"] - perf.loc["100%", "pd_mem"]) / ((rows["x8"] - rows["100%"]) / 1e6), 2))
+mac("cbFull", fmt(perf.loc["100%", "sp_cache_build"], 1)); mac("cbSixteen", fmt(perf.loc["x16", "sp_cache_build"], 1))
+mac("cbOom", fmt(perf.loc[SIZES[-1], "sp_cache_build"], 1))
+mac("pdPerMillion", fmt((perf.loc["x16", "pd_mem"] - perf.loc["100%", "pd_mem"]) / ((rows["x16"] - rows["100%"]) / 1e6), 2))
 eqp = meta["equality_100pct"]
 mac("perfEqThree", f"{max(eqp['W3_oe_sum_rel_diff'], eqp['W3_lender_sd_rel_diff']):.1e}".replace("e-", r"\times10^{-") + "}")
 
+# ratios T_pandas / T_spark at 10% and at the largest common size
+r_ = lambda s, a, b: perf.loc[s, a] / perf.loc[s, b]
+mac("memWOneTen", fmt(r_("10%", "pd_W1", "sp_W1_cache"), 2)); mac("memWOneSixteen", fmt(r_("x16", "pd_W1", "sp_W1_cache"), 1))
+mac("memWThreeTen", fmt(r_("10%", "pd_W3", "sp_W3_cache"), 2)); mac("memWThreeSixteen", fmt(r_("x16", "pd_W3", "sp_W3_cache"), 2))
+mac("memWThreeEightInv", fmt(r_("x8", "sp_W3_cache", "pd_W3"), 1))
+mac("spWOneSixteen", fmt(r_("x16", "pd_W1_cold", "sp_W1_nocache"), 1))
+mac("spWThreeSixteen", fmt(r_("x16", "pd_W3_cold", "sp_W3_nocache"), 1))
+mac("loadShareSixteen", fmt_int(100 * perf.loc["x16", "pd_load"] / perf.loc["x16", "pd_W1_cold"]))
+mac("memWOneFullPd", fmt(perf.loc["100%", "pd_W1"], 2)); mac("memWOneFullSp", fmt(perf.loc["100%", "sp_W1_cache"], 2))
+mac("memWThreeSixPd", fmt(perf.loc["x16", "pd_W3"], 1)); mac("memWThreeSixSp", fmt(perf.loc["x16", "sp_W3_cache"], 1))
 
-def speed(a, b):
-    return a / b
+# the crossover statements in the text, checked against the data (sizes where Pandas is faster)
+both = [s for s in SIZES if perf.loc[s, "pd_status"] == "ok"]
+fast = lambda a, b: [s for s in both if perf.loc[s, a] < perf.loc[s, b]]
+assert fast("pd_W1", "sp_W1_cache") == ["10%", "25%", "50%", "x2"], fast("pd_W1", "sp_W1_cache")
+assert abs(r_("100%", "pd_W1", "sp_W1_cache") - 1) < 0.1                       # 100%: tie
+assert fast("pd_W3", "sp_W3_cache") == ["10%", "25%", "50%", "100%", "x2", "x4", "x8"], fast("pd_W3", "sp_W3_cache")
+assert abs(r_("x16", "pd_W3", "sp_W3_cache") - 1) < 0.1                        # 16x: tie
+assert fast("pd_W1_cold", "sp_W1_nocache") == ["10%", "25%"], fast("pd_W1_cold", "sp_W1_nocache")
+assert fast("pd_W3_cold", "sp_W3_nocache") == ["10%", "25%", "50%", "100%", "x2"], fast("pd_W3_cold", "sp_W3_nocache")
+big = [s for s in SIZES if rows[s] >= rows["x4"]]
+assert all(perf.loc[s, f"sp_{w}_cache"] > perf.loc[s, f"sp_{w}_nocache"] for s in big for w in ["W1", "W2", "W3"])
+
+_pr = pd.read_csv(os.path.join(PF, "perf_runs.csv"))
+_sp = _pr.groupby(["engine", "size", "measure"]).seconds.agg(["min", "median", "max", "count"])
+_sp = _sp[_sp["count"] >= 5]; _sp["spread"] = (_sp["max"] - _sp["min"]) / _sp["median"]
+_sm = _sp.groupby(level=[0, 2]).spread.median()
+mac("spreadPandas", fmt_int(100 * max(_sm[("pandas", w_)] for w_ in ["W1", "W2", "W3"])))
+mac("spreadSparkLo", fmt_int(100 * min(_sm[("spark", f"{w_}_nocache")] for w_ in ["W1", "W2", "W3"])))
+mac("spreadSparkHi", fmt_int(100 * max(_sm[("spark", f"{w_}_nocache")] for w_ in ["W1", "W2", "W3"])))
 
 
-mac("spWOneEight", fmt(speed(perf.loc["x8", "pd_W1_cold"], perf.loc["x8", "sp_W1_nocache"]), 1))
-mac("spWThreeEight", fmt(speed(perf.loc["x8", "pd_W3_cold"], perf.loc["x8", "sp_W3_nocache"]), 1))
-mac("spWThreeTen", fmt(speed(perf.loc["10%", "pd_W3_cold"], perf.loc["10%", "sp_W3_nocache"]), 2))
-mac("spWOneTen", fmt(speed(perf.loc["10%", "pd_W1_cold"], perf.loc["10%", "sp_W1_nocache"]), 2))
+def _lab(s):
+    return s.replace("x", r"$\times$") if s.startswith("x") else s.replace("%", r"\%")
+
 
 # performance table: W1 and W3, each compared in memory (Pandas warm vs Spark cached) and from disk
 # (Pandas cold vs Spark without cache); speedup = T_pandas / T_spark
@@ -395,41 +451,26 @@ for w, title in [("W1", r"W1: denial rate and mean loan amount by loan type $\ti
     lines.append(r"\multicolumn{12}{l}{\emph{" + title + r"}} \\")
     for s_ in SIZES:
         d = perf.loc[s_]
-        lab = s_.replace("x", r"$\times$") if s_.startswith("x") else s_.replace("%", r"\%")
-        stopped = (w == "W3") and d.pd_status == "oom_budget"
-        cells = [lab, f"{d.rows / 1e6:.1f}"] + _cmp(d[f"pd_{w}"], d[f"sp_{w}_cache"], stopped) \
+        stopped = d.pd_status == "oom_budget"
+        cells = [_lab(s_), f"{d.rows / 1e6:.1f}"] + _cmp(d[f"pd_{w}"], d[f"sp_{w}_cache"], stopped) \
             + _cmp(d[f"pd_{w}_cold"], d[f"sp_{w}_nocache"], stopped)
         if w == "W1":
-            cells += [f"{d.pd_mem:.1f}" + (r"$^{a}$" if d.pd_status == "oom_budget" else ""), f"{d.sp_mem:.1f}"]
+            cells += [f"{d.pd_mem:.1f}" + (r"$^{a}$" if stopped else ""), f"{d.sp_mem:.1f}"]
         else:
             cells += ["", ""]
         lines.append(" & ".join(cells) + r" \\")
     if w == "W1":
         lines.append(r"\midrule")
 open(os.path.join(TAB, "perf_main.tex"), "w").write("\n".join(lines) + "\n")
-mac("memWOneEight", fmt(perf.loc["x8", "pd_W1"] / perf.loc["x8", "sp_W1_cache"], 1))
-mac("memWOneTen", fmt(perf.loc["10%", "pd_W1"] / perf.loc["10%", "sp_W1_cache"], 1))
-mac("memWThreeEight", fmt(perf.loc["x8", "pd_W3"] / perf.loc["x8", "sp_W3_cache"], 2))
-mac("memWThreeTen", fmt(perf.loc["10%", "pd_W3"] / perf.loc["10%", "sp_W3_cache"], 2))
-mac("memWThreeEightInv", fmt(perf.loc["x8", "sp_W3_cache"] / perf.loc["x8", "pd_W3"], 1))
-assert (perf["pd_W3"] < perf["sp_W3_cache"]).loc[[z for z in SIZES if z != "x16"]].all()   # Pandas faster in memory at every size
-assert perf.loc["25%", "pd_W1"] < perf.loc["25%", "sp_W1_cache"] and perf.loc["50%", "pd_W1"] > perf.loc["50%", "sp_W1_cache"]
-_pr = pd.read_csv(os.path.join(PF, "perf_runs.csv"))
-_sp = _pr.groupby(["engine", "size", "measure"]).seconds.agg(["min", "median", "max", "count"])
-_sp = _sp[_sp["count"] >= 5]; _sp["spread"] = (_sp["max"] - _sp["min"]) / _sp["median"]
-_sm = _sp.groupby(level=[0, 2]).spread.median()
-mac("spreadPandas", fmt_int(100 * max(_sm[("pandas", w_)] for w_ in ["W1", "W2", "W3"])))
-mac("spreadSparkLo", fmt_int(100 * min(_sm[("spark", f"{w_}_nocache")] for w_ in ["W1", "W2", "W3"])))
-mac("spreadSparkHi", fmt_int(100 * max(_sm[("spark", f"{w_}_nocache")] for w_ in ["W1", "W2", "W3"])))
 
 # warm / cache table
 lines = []
 for s in SIZES:
     d = perf.loc[s]
-    lab = s.replace("x", r"$\times$") if s.startswith("x") else s.replace("%", r"\%")
-    def g(v, miss="n.r."):
+    miss = "stopped" if d.pd_status == "oom_budget" else "n.r."
+    def g(v):
         return miss if np.isnan(v) else f"{v:.2f}"
-    cells = [lab, g(d.pd_load), g(d.pd_W1), g(d.pd_W2), g(d.pd_W3, "stopped"), f"{d.sp_init:.1f}", f"{d.sp_cache_build:.1f}",
+    cells = [_lab(s), g(d.pd_load), g(d.pd_W1), g(d.pd_W2), g(d.pd_W3), f"{d.sp_init:.1f}", f"{d.sp_cache_build:.1f}",
              f"{d.sp_W1_cache:.2f}", f"{d.sp_W1_nocache:.2f}", f"{d.sp_W2_cache:.2f}", f"{d.sp_W2_nocache:.2f}",
              f"{d.sp_W3_cache:.2f}", f"{d.sp_W3_nocache:.2f}"]
     lines.append(" & ".join(cells) + r" \\")
@@ -639,12 +680,6 @@ mac("twLeTwoShare", fmt(100 * _kn["twoway_share_lenders_le2_msas"], 1))
 _jt = rd(os.path.join(P, "sq2_dti_jump_test.csv"))
 _jf = _jt[_jt["scope"].astype(str) == "2"].set_index("jump")["excess"]
 mac("jumpFHAFortythree", pp(_jf["42 -> 43"], 2)); mac("jumpFHAFortyfive", pp(_jf["44 -> 45"], 2))
-# compute-only comparison: Pandas with data already in memory against Spark reading Parquet
-mac("warmWOneFull", fmt(perf.loc["100%", "pd_W1"], 2)); mac("spWOneFull", fmt(perf.loc["100%", "sp_W1_nocache"], 2))
-mac("warmSpWOneEight", fmt(perf.loc["x8", "pd_W1"] / perf.loc["x8", "sp_W1_nocache"], 1))
-mac("warmSpWThreeEight", fmt(perf.loc["x8", "pd_W3"] / perf.loc["x8", "sp_W3_nocache"], 1))
-mac("warmWThreeFour", fmt(perf.loc["x4", "pd_W3"], 1)); mac("spWThreeFour", fmt(perf.loc["x4", "sp_W3_nocache"], 1))
-mac("loadShareEight", fmt_int(100 * perf.loc["x8", "pd_load"] / perf.loc["x8", "pd_W1_cold"]))
 
 # ---------------------------------------------------------------- write macros
 with open(os.path.join(OUT, "numbers.tex"), "w") as fh_:
@@ -781,12 +816,12 @@ for ax, pcol, scol, ttl in [(a0, "pd_{}", "sp_{}_cache", "(a) In memory"), (a1, 
     ax.set_xscale("log"); ax.set_yscale("log"); ax.set_ylim(0.025, 80)
     ax.set_xlabel("Rows (millions, log scale)"); ax.set_title(ttl)
 a0.set_ylabel("Median time (s, log scale)")
-a0.legend(frameon=False, fontsize=6.5, ncol=2, loc="lower right", columnspacing=0.8, handlelength=1.6)
+a0.legend(frameon=False, fontsize=6.5, ncol=2, loc="upper left", columnspacing=0.8, handlelength=1.6)
 pm_ok = perf[perf.pd_status == "ok"]
 a2.plot(pm_ok.rows / 1e6, pm_ok.pd_mem, color=C_PD, marker="o", ms=3, lw=1, label="Pandas")
-a2.plot([pm_ok.rows.iloc[-1] / 1e6, perf.loc["x16", "rows"] / 1e6], [pm_ok.pd_mem.iloc[-1], perf.loc["x16", "pd_mem"]],
+a2.plot([pm_ok.rows.iloc[-1] / 1e6, perf.loc[SIZES[-1], "rows"] / 1e6], [pm_ok.pd_mem.iloc[-1], perf.loc[SIZES[-1], "pd_mem"]],
         color=C_PD, lw=1, ls=":")
-a2.scatter([perf.loc["x16", "rows"] / 1e6], [perf.loc["x16", "pd_mem"]], marker="x", color=C_PD, s=30, zorder=5)
+a2.scatter([perf.loc[SIZES[-1], "rows"] / 1e6], [perf.loc[SIZES[-1], "pd_mem"]], marker="x", color=C_PD, s=30, zorder=5)
 a2.plot(xr, perf.sp_mem, color=C_SP, marker="o", ms=3, lw=1, ls="--", label="Spark (incl. JVM)")
 a2.axhline(meta["env"]["memory_budget_gb"], color="black", lw=0.7)
 a2.text(0.6, meta["env"]["memory_budget_gb"] + 0.8, f"budget {meta['env']['memory_budget_gb']:.0f} GB", fontsize=7)

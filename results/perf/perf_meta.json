@@ -9,7 +9,9 @@
   "pyarrow": "23.0.1",
   "pyspark": "4.0.4",
   "rules_version": "1.1",
-  "w0_source": "original FFIEC CSV"
+  "w0_csv_gb": 4.64,
+  "w0_source": "original FFIEC CSV",
+  "raw_parquet_gb": 0.61
  },
  "sizes": {
   "10%": {
@@ -51,6 +53,11 @@
    "path": "/tmp/hmda_perf/data/x16",
    "rows": 92405200,
    "disk_mb": 1011.0
+  },
+  "x32": {
+   "path": "/tmp/hmda_perf/data/x32",
+   "rows": 184810400,
+   "disk_mb": 2022.1
   }
  },
  "equality_100pct": {
@@ -59,15 +66,16 @@
   "W3_oe_sum_rel_diff": 1.6117737123702159e-15,
   "W3_lender_sd_rel_diff": 1.8708708170987051e-16,
   "W3_msa_sd_rel_diff": 0.0,
-  "W3_top_equal": true
+  "W3_top_equal": true,
+  "all_equal": true
  },
  "pandas_oom": [
   {
-   "size": "x16",
-   "rows": 92405200.0,
-   "peak_rss_gb": 29.002,
-   "stage": "W3 run 0",
-   "seconds": 411.1
+   "size": "x32",
+   "rows": 184810400.0,
+   "peak_rss_gb": 29.071,
+   "stage": "load run 0",
+   "seconds": 51.7
   }
  ]
 }

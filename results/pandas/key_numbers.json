@@ -1,6 +1,7 @@
 {
  "rules_version": "1.1",
  "engine": "pandas",
+ "env_pandas_notebook": "python 3.13.18; numpy 2.1.3; pandas 2.3.3; pyarrow 23.0.1; scikit-learn 1.6.1; matplotlib 3.10.0",
  "all_records": 12259199,
  "core": 5775325,
  "decisioned": 4514505,
@@ -9,6 +10,10 @@
  "pricing_usable": 3367479,
  "duplicates": 26755,
  "rs_out_of_range": 56,
+ "occupancy_non_principal_share_conventional": 0.079710388349888,
+ "occupancy_non_principal_share_FHA": 0.0011876172706409456,
+ "occupancy_non_principal_share_VA": 0.0013299478620995675,
+ "occupancy_non_principal_share_USDA": 0.00033397902611715985,
  "denial_rate_core": 0.1543083903993904,
  "denial_rate_conventional": 0.13245102728386043,
  "denial_rate_FHA": 0.21756157678626709,
@@ -223,6 +228,7 @@
  "twoway_share_lenders_le2_msas": 0.002617801047120419,
  "twoway_lenders_both_halves": 764,
  "twoway_msas_both_halves": 392,
+ "conv_twoway_last_iter_max_change": 3.837208328860697e-14,
  "hhi_median": 400.56649894718186,
  "hhi_p10": 260.5013156274688,
  "hhi_p90": 685.4433062815763,
@@ -240,5 +246,5 @@
  "pred_p_gbt_calibration_slope": 0.9862428493857776,
  "pred_spearman_cells_vs_lr": 0.98293651990418,
  "pred_spearman_cells_vs_gbt": 0.9858037879437035,
- "runtime_s": 817.7
+ "runtime_s": 823.5
 }

@@ -25,8 +25,10 @@ src/
   py_to_ipynb.py               converts the .py files (with "# %%" cell markers) to notebooks
   gen_synth.py                 synthetic file with the HMDA schema, used to test the code before the real run
   columns.txt                  the 99 field names in file order, read by gen_synth.py
-notebooks/                     the four notebooks as executed on Kaggle (version 1), with all cell outputs;
-                               their code cells are identical to the files in src/
+notebooks/                     the five v2 notebooks run on Kaggle on 15 November 2026 (code cells identical to src/,
+                               saved without outputs; the executed copies with outputs are on Kaggle)
+  v1_executed/                 the four notebooks of the first run (7 November 2026) with all cell outputs;
+                               their code is the pre-review version, kept for reference
 results/
   pandas/, spark/              all result tables of the two pipelines, including eq_*.csv and key_numbers.json
   equivalence/                 comparison of the two (summary and every compared value)
@@ -84,9 +86,9 @@ export HMDA_OUT=output                # results go to output/results/... and out
 export HMDA_WORK=/path/to/scratch     # temporary files (several GB for step 4)
 
 python src/pandas_pipeline.py         # about 14 minutes on the Kaggle machine
-python src/spark_pipeline.py          # about 26 minutes
+python src/spark_pipeline.py          # about 22 minutes
 python src/check_equivalence.py output/results/pandas output/results/spark output/results/equivalence
-python src/perf_pipeline.py           # about 70 minutes
+python src/perf_pipeline.py           # about 61 minutes
 ```
 
 Optional switches of the performance script: `PERF_SIZES` (for example `10%,25%,50%,100%`), `PERF_RUNS`,
@@ -96,7 +98,8 @@ Optional switches of the performance script: `PERF_SIZES` (for example `10%,25%,
 
 1. Create three datasets: the Parquet file (`hmda-2024-one-year-raw`), the two files of `config/` (`hmda-config`),
    and the original LAR CSV and Transmittal Sheet imported from the FFIEC links (`hmda-2024-ffiec-files`).
-2. Upload the four notebooks of `notebooks/`, add the three datasets as input, accelerator none, internet off, Run All.
+2. Upload the notebooks of `notebooks/` (`HMDA_v2_convert` first, to write the Parquet file), add the datasets as
+   input, accelerator none, internet off, Run All.
 3. For the equivalence notebook, add the outputs of the Pandas and PySpark notebooks as input.
 
 ### Step 5: rebuild the report
@@ -125,8 +128,7 @@ counts or the two engines disagree. Running it on this folder reproduces `report
    concentration (SQ4); optional denial model with lender-grouped five-fold cross-fitting.
 
 All definitions are in `config/rules.yaml`, which both pipelines read, so the cleaning rules are identical by construction.
-The copy here differs from the one used in the Kaggle run only in two comment lines of its change log; its parsed
-content is identical.
+The copies in `config/` are byte-identical to the ones used in the v2 Kaggle run.
 
 ### Where each part of the report comes from
 
@@ -149,22 +151,38 @@ content is identical.
 `src/check_equivalence.py` compares six required outputs (`eq_1` to `eq_6` in each results folder), the full field
 profile and every key number both pipelines write to `key_numbers.json`. Counts must match exactly, means and rates
 within 1e-9 and results of the iterative two-way model within 1e-6 (the difference is divided by the larger magnitude
-when that exceeds one, and taken as is below one). Result of the run in this
-folder: 1,682 values agree, largest relative difference 2.7e-12 (`results/equivalence/equivalence_summary.md`).
+when that exceeds one, and taken as is below one). Result for the files in this
+folder: 1,684 values agree, largest relative difference 2.5e-12 (`results/equivalence/equivalence_summary.md`).
+The same comparison run on Kaggle against the v2 outputs also found every value in agreement.
 
 ## 7. Performance experiment
 
 `src/perf_pipeline.py` builds a 15-column table of the core sample, samples it at 10, 25, 50 and 100% and replicates
-it 2, 4, 8 and 16 times (replicas are used only for this benchmark). Each engine and size runs in its own process;
+it 2, 4 and 8 times, then keeps doubling (16, 32, 64 times) until the Pandas run is stopped (replicas are used only
+for this benchmark). In the v2 run Pandas completed 16 times (92.4 million rows, 24.2 GB) and was stopped while
+loading the 32-times table (184.8 million rows); Spark completed every size. W0 reads the original CSV with Pandas in
+three ways (C and PyArrow parsers with all fields as strings, and PyArrow with Arrow-backed types) and with Spark. Each engine and size runs in its own process;
 the parent process samples memory every 0.2 s and stops a run at 90% of RAM. Each measure is the median of five runs
 after one warm-up. Spark session start, cache building, cached and uncached runs are timed separately.
 
 - `results/perf/perf_runs.csv`: every timed run
 - `results/perf/perf_summary.csv`, `perf_table_medians.csv`: medians
 - `results/perf/perf_memory.csv`: peak memory and the stage where a run was stopped
-- `results/perf/perf_meta.json`: hardware and software
+- `results/perf/perf_meta.json`: hardware and software, sizes, the 100% equality check
+- `results/perf/perf_log_summary.md`: the same in readable tables
 
-## 8. What is not included
+## 8. Which run produced the files in `results/`
+
+All results come from the v2 run (rules 1.1, code as in `src/`, Kaggle, 15 November 2026), with one exception.
+The v2 Pandas outputs are byte-identical to those of the first run except for `checks_vs_expected.csv`,
+`key_numbers.json` and the new `dq_occupancy_by_type.csv`. The v2 PySpark outputs differ from the first run's only in
+the last digits of floating-point sums, which change with the order of Spark's partial aggregations; for those files
+`results/spark/` keeps the first run's copies, and only `checks_vs_expected.csv`, `key_numbers.json`,
+`dq_occupancy_by_type.csv` and `pred_mllib_vs_sklearn_by_purpose.csv` are from v2. `results/equivalence/` is computed
+from the files in this folder. The five files in `results/perf/` were checked against the md5 sums printed in the
+Kaggle log.
+
+## 9. What is not included
 
 - The raw data (see section 2).
 - Two per-record prediction files (`pred_oof.parquet`, about 85 MB, and its MLlib counterpart, about 50 MB); the

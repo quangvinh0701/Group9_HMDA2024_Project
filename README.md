@@ -37,7 +37,7 @@ src/
 notebooks/                     the notebooks we ran on Kaggle on 15 November 2026, with all their outputs
                                (pandas, pyspark, performance, check_equivalence). Their code is the same as in src/.
                                HMDA_convert contains the code of step 0.
-  extra/                       the four check notebooks run on 16 November 2026 (code only; see section 8)
+  extra/                       the four check notebooks run on 16 November 2026, with all their outputs (section 8)
 tests/                         pytest suite (section 6)
 results/
   pandas/, spark/              every result table of the two pipelines, including eq_*.csv and key_numbers.json
@@ -247,8 +247,8 @@ with `src/check_equivalence.py` and gives the same files as the equivalence note
 
 The checks were run on Kaggle on 16 November 2026 in four more notebooks (`notebooks/extra/`): `HMDA_extra_checks`
 (DuckDB check, Data Browser slices, subgroup calibration), `HMDA_sensitivity_open_end`, `HMDA_cache_diagnosis` and
-`HMDA_clean_core_export`. Their small output files were copied into `results/` and checked against the MD5 sums the
-notebooks printed.
+`HMDA_clean_core_export`. The executed notebooks, with every cell output, are in `notebooks/extra/`. Their small output
+files were copied into `results/` and checked against the MD5 sums the notebooks printed.
 
 ## 9. What is not included
 
@@ -258,8 +258,6 @@ notebooks printed.
   `pred_lender_oe_comparison_spark.csv`, about 500 KB together). The report uses the Pandas versions in
   `results/pandas/`; the Spark side of these tables is compared through `key_numbers.json` and
   `eq_6_top50_lenders.csv`. The PySpark notebook writes them when it runs.
-- From the checks: the clean core table itself (a Kaggle notebook output, see section 5), the per-lender output
-  of the DuckDB check (`ind_oe_lender.csv`) and the full value-by-value comparison (`independent_vs_pandas.csv`);
-  the summary of that comparison is included.
+- From the checks: the clean core table itself (146 MB, a Kaggle notebook output, see section 5).
 - Two per-record prediction files (`pred_oof.parquet`, about 85 MB, and its MLlib counterpart, about 50 MB); the
   pipelines create them again when run.

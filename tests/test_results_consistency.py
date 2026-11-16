@@ -96,3 +96,16 @@ def test_cache_fitted_in_memory():
     assert (d[["cache_full_disk_gb", "cache_w1cols_disk_gb"]] == 0).all().all()
     assert (d["cache_full_mem_gb"] < d["storage_max_gb"]).all()
     assert (d["cache_full_partitions_cached"] == d["cache_full_partitions"]).all()
+
+
+def test_independent_lender_oe_matches_pandas():
+    a = pd.read_csv(os.path.join(RES, "independent", "ind_oe_lender.csv"))
+    b = P("sq4_lender_oe")[["lei", "n", "O", "E"]]
+    m = b.merge(a, on="lei", suffixes=("_pd", "_db"))
+    assert len(m) == len(b)
+    assert (m["n_pd"] == m["n_db"]).all() and (m["O_pd"] == m["O_db"]).all()
+    assert np.allclose(m["E_pd"], m["E_db"], rtol=1e-9, atol=0)
+    d = pd.read_csv(os.path.join(RES, "independent", "independent_vs_pandas.csv"))
+    assert d["agree"].all()
+    s = pd.read_csv(os.path.join(RES, "independent", "independent_vs_pandas_summary.csv"))
+    assert len(d) == s["values"].sum()

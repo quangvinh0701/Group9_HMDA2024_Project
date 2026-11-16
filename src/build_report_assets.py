@@ -936,7 +936,7 @@ plt.close(fig)
 # F2 DTI: (a) all 19 levels; (b) 36..49, 50-60 by type with counts
 jtab = rd(os.path.join(P, "sq2_dti_jump_table.csv"))
 jtab["scope"] = jtab["scope"].astype(str)
-fig, (a1, a2) = plt.subplots(1, 2, figsize=(6.8, 2.6), gridspec_kw={"width_ratios": [1.05, 1]})
+fig, (a1, a2) = plt.subplots(1, 2, figsize=(6.8, 2.15), gridspec_kw={"width_ratios": [1.05, 1]})
 labs = list(d19.dti)
 a1.plot(range(len(labs)), d19.denial_rate * 100, color=C_ALL, marker="o", ms=2.5, lw=1)
 a1.set_xticks(range(len(labs)))
@@ -1016,8 +1016,8 @@ TILE = {"AK": (0, 0), "ME": (0, 11), "VT": (1, 10), "NH": (1, 11),
         "LA": (6, 5), "MS": (6, 6), "AL": (6, 7), "GA": (6, 8), "HI": (7, 0), "TX": (7, 4), "FL": (7, 9)}
 so = rd(os.path.join(P, "sq3_state_oe.csv"), keep_default_na=False).set_index("state_code")
 assert set(so.index) == set(TILE), set(so.index) ^ set(TILE)
-fig = plt.figure(figsize=(7.0, 2.45))
-gs = fig.add_gridspec(1, 3, width_ratios=[1.25, 1, 1], wspace=0.28)
+fig = plt.figure(figsize=(7.0, 2.2))
+gs = fig.add_gridspec(1, 3, width_ratios=[1.3, 1, 1], wspace=0.26, left=0.01, right=0.99, top=0.9, bottom=0.2)
 am = fig.add_subplot(gs[0])
 axes = [fig.add_subplot(gs[1]), None]
 axes[1] = fig.add_subplot(gs[2], sharey=axes[0])
@@ -1032,7 +1032,8 @@ for st, (r_, c_) in TILE.items():
 am.set_xlim(-0.2, 12.1); am.set_ylim(-7.2, 1.1); am.set_aspect("equal"); am.axis("off")
 am.set_title("(a) States: risk-standardized $O/E$", fontsize=8)
 sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
-cb = fig.colorbar(sm, ax=am, orientation="horizontal", fraction=0.06, pad=0.02, aspect=30)
+cax = am.inset_axes([0.08, -0.07, 0.84, 0.045])
+cb = fig.colorbar(sm, cax=cax, orientation="horizontal")
 cb.ax.tick_params(labelsize=6); cb.set_ticks([0.8, 0.9, 1.0, 1.1, 1.2])
 for ax, d_, title, col in [(axes[0], lo, f"(b) Lenders (n = {len(lo)})", C_CONV), (axes[1], ms, f"(c) MSAs (n = {len(ms)})", C_FHA)]:
     cst = np.median(d_.V / d_.E)

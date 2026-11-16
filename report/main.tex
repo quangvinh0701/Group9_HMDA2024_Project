@@ -30,6 +30,9 @@
 % allow slightly looser lines instead of lines running into the margin of the narrow columns
 \setlength{\emergencystretch}{1.5em}
 
+\setcounter{dbltopnumber}{4}
+\setcounter{topnumber}{3}
+\setcounter{totalnumber}{6}
 \begin{document}
 
 \title[Mortgage Credit Access and Pricing in 2024]{Mortgage Credit Access and Pricing in 2024: A Large-Scale HMDA Analysis Across Products, Regions, and Lenders}
@@ -118,6 +121,24 @@ No state, decisioned (usable) & \nNoStateDec{} (\nNoState) & Reported separately
 
 \section{Descriptive and Diagnostic Analysis}\label{sec:findings}
 
+Table~\ref{tab:glance} summarizes the answers; the subsections give the evidence.
+
+\begin{table}[t]
+\caption{The four sub-questions at a glance; details in Sections~\ref{sec:sqone}--\ref{sec:sqfour}.}\label{tab:glance}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{@{}lX@{}}
+\toprule
+& Main finding \\
+\midrule
+SQ1 & FHA is denied more often than conventional (\drFHA\% against \drConv\%), but purpose matters more: \drPurchase\% of purchase and \drCashout\% of cash-out applications are denied. \\
+SQ2 & Risk mix explains \kgFHAcompShare\% of the FHA gap on average but not its shape; the cash-out gap lies almost entirely within risk cells (\kgCOrate{} of \kgCOgap{} points). Denial jumps at 50\% DTI (\jumpConvMain{} points for conventional loans), not at 43\%. \\
+SQ3 & Risk adjustment narrows state differences (SD \sdStateRaw{} $\to$ \sdStateStd{} points); the LMI gap (\kgLMIgap{} points) lies mostly within risk cells. \\
+SQ4 & Lenders vary about \twRatio{} times as much as MSAs (signal SD \twLenderSD{} against \twMSASD{} points; $\tau$ = \tauLender{} against \tauMSA). \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 \subsection{Products and Outcomes (SQ1)}\label{sec:sqone}
 
 Table~\ref{tab:products} and Figure~\ref{fig:products}a show outcomes by product. FHA applications are denied at \drFHA\%, against \drConv\% for conventional ones. The purpose of the loan matters even more than its type: \drPurchase\% of purchase applications are denied, \drCashout\% of cash-out refinances, and over 40\% of home-improvement and other loans. Originated FHA loans are smaller and carry higher spreads than conventional loans, while VA spreads are negative, as one would expect for a government-guaranteed product. Raw denial rates across products therefore mostly compare purposes and applicant pools; they become informative only at equal risk (Section~\ref{sec:sqtwo}), and may simply reflect who chooses each product rather than how lenders judge applications.
@@ -147,7 +168,9 @@ Loan type & Applications & Originated & Withdrawn, incomplete & Decisioned & Den
 
 \subsection{Risk and the Composition of Gaps (SQ2)}\label{sec:sqtwo}
 
-\textbf{Denial and DTI (H2).} Figure~\ref{fig:dti} shows that denial stays flat, between \drDTImidMin\% and \drDTImidMax\%, at every DTI value from 30\% to 49\%. It then climbs to \drDTIfiftySixty\% at 50--60\% and \drDTIoverSixty\% above 60\%. To test for a jump, we compare the change between neighbouring DTI values with the average step inside 36--49 (Appendix Table~\ref{tab:jump}). For conventional loans, denial rises from \drConvFortynine\% at DTI 49 to \drConvFiftySixty\% at 50--60, an excess of \jumpConvMain{} points (95\% CI \jumpConvMainLo--\jumpConvMainHi). The step from 42 to 43 is only \jumpConvFortythree{} points, and the placebo cuts at 40 and 47 are not significant for conventional loans. Two caveats apply. The 50--60 value is one bin covering eleven DTI values, so the main step compares a single value with a bin average; it is not a regression discontinuity estimate. And with samples this large, even tiny steps come out significant (for FHA, \jumpFHAFortythree{} points at 43 and \jumpFHAFortyfive{} at 45), so our conclusion rests on the size of the step, about 65 points against less than 1, and not on its p-value. Applications also bunch at exactly 49, with \bunchConv{} times the average count at 44--48. FHA and VA show only small jumps at 50 (\jumpFHAMain{} and \jumpVAMain{} points).
+\textbf{Denial and DTI (H2).} Figure~\ref{fig:dti} shows that denial stays flat, between \drDTImidMin\% and \drDTImidMax\%, at every DTI value from 30\% to 49\%. It then climbs to \drDTIfiftySixty\% at 50--60\% and \drDTIoverSixty\% above 60\%. To test for a jump, we compare the change between neighbouring DTI values with the average step inside 36--49 (Appendix Table~\ref{tab:jump}). For conventional loans, denial rises from \drConvFortynine\% at DTI 49 to \drConvFiftySixty\% at 50--60, an excess of \jumpConvMain{} points (95\% CI \jumpConvMainLo--\jumpConvMainHi). The step from 42 to 43 is only \jumpConvFortythree{} points, and the placebo cuts at 40 and 47 are not significant for conventional loans.
+
+Two caveats apply. The 50--60 value is one bin covering eleven DTI values, so the main step compares a single value with a bin average; it is not a regression discontinuity estimate. And with samples this large, even tiny steps come out significant (for FHA, \jumpFHAFortythree{} points at 43 and \jumpFHAFortyfive{} at 45), so our conclusion rests on the size of the step, about 65 points against less than 1, and not on its p-value. Applications also bunch at exactly 49, with \bunchConv{} times the average count at 44--48. FHA and VA show only small jumps at 50 (\jumpFHAMain{} and \jumpVAMain{} points).
 
 The limit that binds conventional loans in 2024 is thus 50\%, the cap in the GSEs' automated underwriting \citep{fanniemae_dti}, not the 43\% limit of the old Qualified Mortgage rule, which a price-based test replaced \citep{cfpb2020qm}. Applicants or loan officers seem to shape applications so that they land just under 50\%. Other readings exist: lenders report DTI after underwriting, so some bunching may come from recalculation rather than from borrowers. And applications above 50\% may be steered to FHA instead of being denied. The heatmap supports this: at DTI 50--60 and CLTV 95--100, where \fhaHighDTIcltvHundred\% of applications are FHA, denial is only \drHighDTIcltvHundred\% (Figure~\ref{fig:heatmap}, Appendix~\ref{app:supp}).
 
@@ -177,7 +200,7 @@ Adjusting for risk changes less across states than across products. The standard
 
 About a third of the spread in raw state denial rates disappears once applicants are compared at equal measured risk, so ranking places by their raw denial rates says little about lending standards. The remaining LMI gap is not proof of different treatment either. Credit scores, which HMDA leaves out, may differ between LMI and other tracts, and our risk cells only use three ratios.
 
-\subsection{Lenders (SQ4)}
+\subsection{Lenders (SQ4)}\label{sec:sqfour}
 
 The \nLenderEightTwelve{} lenders with at least 500 decisioned applications account for \lenderShare\% of all decisions, and \nLender{} of them also have at least 80\% usable applications. Their $O/E$ ratios are much more spread out than those of MSAs (H3; Figure~\ref{fig:funnel}b,~c): $\tau=\tauLender$ against \tauMSA, and \lenderOutside\% of lenders fall outside the 95\% limits (\lenderOutsideHigh\% outside 99.8\%). The distribution is skewed. The median lender has $O/E=\lenderMedianOE$, there is a long upper tail above 2, and \nZeroDen{} lenders denied nobody at all. The expected rate is weighted by applications and so driven by large lenders; most lenders sit below 1, which inflates the share outside a funnel centred on 1, but not $\tau$, which measures spread around the mean. Weighted by applications, $\tau$ is \tauLenderW{} for lenders and \tauMSAW{} for MSAs. Median $O/E$ is \agHUD{} for the \nHUD{} lenders supervised through HUD (independent mortgage companies) and \agCFPB{} for the large banks supervised by the CFPB.
 
@@ -216,7 +239,17 @@ Output & Values & Max.\ rel.\ diff. & Agree \\
 \end{tabularx}
 \end{table}
 
-All \eqTotal{} values agree, as do the \dEqValues{} distribution statistics of Section~\ref{sec:sqone} (largest relative difference $\dEqMax\times10^{\dEqMaxExp}$). The largest difference among the main values, $\eqMaxDiff\times10^{\eqMaxExp}$, is in the national $O/E$ of the five-band DTI sensitivity check, whose denominator adds up expected probabilities over the whole usable sample, and it comes from the order in which floating-point numbers are summed. The two-way results differ by less than $10^{-15}$. Two rank correlations that Spark derives from the Pandas predictions are left out of the \nKeyNumbers{} key numbers, as they are not independent. Spark's \fd{percentile_approx} misses the exact median by up to \approxErr\% (\approxAbs{} points of rate spread), which is why we report exact medians. Three known sources of disagreement were removed by design, not by adjusting results. Pandas drops missing group keys by default while Spark keeps them, so both code them as \fd{NA}. Every window ordering ends with a unique key (the row or lender identifier), so ties are broken the same way. And both engines read text from Parquet, so a CSV reader never turns \fd{NA} into a null. Before the real run, both notebooks were tested on a synthetic file with the same schema, where the script also reported full agreement. We do not expect predictions from different libraries to match exactly. The MLlib and scikit-learn logistic regressions correlate at \corrMLlib{} out of fold with identical folds, yet \nDiffMLlib{} predictions differ by more than 0.05, up to \maxDiffMLlib. Of these, \nDiffMLlibNA{} are among the \nPurposeNA{} applications whose purpose is ``not applicable''. In this rare category, scikit-learn's weak L2 penalty bounds the coefficient while unpenalized MLlib lets it drift; elsewhere the largest difference is \maxDiffMLlibOther.
+All \eqTotal{} values agree, as do the \dEqValues{} distribution statistics of Section~\ref{sec:sqone} (largest relative difference $\dEqMax\times10^{\dEqMaxExp}$). The largest difference among the main values, $\eqMaxDiff\times10^{\eqMaxExp}$, is in the national $O/E$ of the five-band DTI sensitivity check, whose denominator adds up expected probabilities over the whole usable sample, and it comes from the order in which floating-point numbers are summed. The two-way results differ by less than $10^{-15}$. Two rank correlations that Spark derives from the Pandas predictions are left out of the \nKeyNumbers{} key numbers, as they are not independent. Spark's \fd{percentile_approx} misses the exact median by up to \approxErr\% (\approxAbs{} points of rate spread), which is why we report exact medians.
+
+\textbf{Differences removed by design.} Three known sources of disagreement were removed in the code, not by adjusting results:
+\begin{itemize}[leftmargin=1.1em,itemsep=0pt,topsep=2pt,parsep=0pt]
+\item Pandas drops missing group keys by default while Spark keeps them, so both code them as \fd{NA}.
+\item Every window ordering ends with a unique key (the row or lender identifier), so ties are broken the same way.
+\item Both engines read text from Parquet, so a CSV reader never turns \fd{NA} into a null.
+\end{itemize}
+Before the real run, both notebooks were tested on a synthetic file with the same schema, where the script also reported full agreement.
+
+\textbf{Predictions.} We do not expect predictions from different libraries to match exactly. The MLlib and scikit-learn logistic regressions correlate at \corrMLlib{} out of fold with identical folds, yet \nDiffMLlib{} predictions differ by more than 0.05, up to \maxDiffMLlib. Of these, \nDiffMLlibNA{} are among the \nPurposeNA{} applications whose purpose is ``not applicable''. In this rare category, scikit-learn's weak L2 penalty bounds the coefficient while unpenalized MLlib lets it drift; elsewhere the largest difference is \maxDiffMLlibOther.
 
 \textbf{Beyond agreement between the two engines.} Both notebooks read the same rules file, so a wrong rule would be copied into both and they would still agree. We therefore wrote a third implementation in DuckDB SQL that does not read the rules file: every filter, code mapping, band edge, and the 30-case fallback are written out by hand. It reproduces all \indValues{} values we compared with Pandas (\indQuantities{} groups: sample sizes, outcomes, loan amounts, and spreads by type, the 19 DTI rates, denial by state, and $O$, $E$, and $O/E$ for every state and lender), with a largest relative difference of $\indMaxDiff\times10^{\indMaxExp}$. The Data Browser comparison of Section~2 checks the reading of the raw file against the FFIEC's own aggregates. Table~\ref{tab:verify} sums up the three checks. Together they show that the file is read and the rules are applied as written. Whether a rule is a good choice is a judgment, which we test by varying it (Table~\ref{tab:sens} and Appendix~\ref{app:checks}).
 
@@ -235,7 +268,18 @@ Check & Values & Max.\ rel.\ diff. & Agree \\
 
 \section{Performance and Scalability Experiment}
 
-\textbf{Design.} As the instructor advised, we use replicated data only for this benchmark. The input is a 15-column table of the cleaned core sample, so ``100\%'' means its \nCore{} rows, not the whole file; the full file of \nAll{} records is only used in W0. We sample it at 10, 25, and 50\% using a hash of the row identifier, and replicate it 2, 4, and 8 times with shifted identifiers. Pandas still coped at 8$\times$, so we kept doubling until its run was stopped, at 32$\times$. Replication adds rows but not lenders or counties, so grouping may get cheaper relative to genuinely new data of the same size. The workloads are: (W0) reading the original \wzCsvGb{} GB CSV with all 99 fields, which Pandas loads into memory in three ways (the C and PyArrow parsers with every field as a Python string, and the PyArrow parser with Arrow-backed types it infers itself), while Spark, with column pruning turned off, splits every row into fields and counts the rows without keeping them; (W1) denial rate and mean loan amount by loan type $\times$ purpose; (W2) denial rate for each valid county; and (W3) a broadcast join with the Transmittal Sheet, lender $O/E$, ranking within agency, and ten iterations of the two-way model. Each engine and size runs in its own process on the same Kaggle machine (4 CPUs, \ramTotal{} GB RAM, Linux, Python 3.13, Pandas 2.3.3, PyArrow 23.0.1, PySpark 4.0.4 in local mode on all four cores). We sample the memory of the whole process tree, Spark's JVM included, every 0.2 s and stop a run at \budget{} GB, a budget we set at 90\% of RAM; ``stopped'' in the tables means this stop, not a crash. Every figure is the median of five runs after one warm-up. Pandas times are given \emph{warm}, with the data already in memory, and \emph{cold}, as the median time to read the 15-column table plus the median warm time. Spark times are given without a cache, reading and computing in one action, and on a cached table, with session start and cache building timed separately for each size. \emph{In memory} (Pandas warm against Spark cached) isolates the computation. \emph{From disk} (Pandas cold against Spark without cache) includes the read, but it is not quite fair, because Pandas reads all 15 columns while Spark reads only the four or five a query needs. Each Pandas workload selects just the columns it uses before grouping, as Spark's optimizer does. Repeated Pandas runs vary by about \spreadPandas\% of the median and uncached Spark runs by \spreadSparkLo--\spreadSparkHi\%, so small differences should be read as ties. At 100\% the two engines give the same W1 and W2 results, and W3 results that agree within $\perfEqThree$.
+\textbf{Data.} As the instructor advised, we use replicated data only for this benchmark. The input is a 15-column table of the cleaned core sample, so ``100\%'' means its \nCore{} rows, not the whole file; the full file of \nAll{} records is only used in W0. We sample it at 10, 25, and 50\% using a hash of the row identifier, and replicate it 2, 4, and 8 times with shifted identifiers. Pandas still coped at 8$\times$, so we kept doubling until its run was stopped, at 32$\times$. Replication adds rows but not lenders or counties, so grouping may get cheaper relative to genuinely new data of the same size.
+
+\textbf{Workloads.}
+\begin{itemize}[leftmargin=2.2em,itemsep=0pt,topsep=2pt,parsep=0pt]
+\item[(W0)] Reading the original \wzCsvGb{} GB CSV with all 99 fields. Pandas loads it into memory in three ways (the C and PyArrow parsers with every field as a Python string, and the PyArrow parser with Arrow-backed types it infers itself); Spark, with column pruning turned off, splits every row into fields and counts the rows without keeping them.
+\item[(W1)] Denial rate and mean loan amount by loan type $\times$ purpose.
+\item[(W2)] Denial rate for each valid county.
+\item[(W3)] A broadcast join with the Transmittal Sheet, lender $O/E$, ranking within agency, and ten iterations of the two-way model.
+\end{itemize}
+\textbf{Setup.} Each engine and size runs in its own process on the same Kaggle machine (4 CPUs, \ramTotal{} GB RAM, Linux, Python 3.13, Pandas 2.3.3, PyArrow 23.0.1, PySpark 4.0.4 in local mode on all four cores). We sample the memory of the whole process tree, Spark's JVM included, every 0.2 s and stop a run at \budget{} GB, a budget we set at 90\% of RAM; ``stopped'' in the tables means this stop, not a crash.
+
+\textbf{Timing.} Every figure is the median of five runs after one warm-up. Pandas times are given \emph{warm}, with the data already in memory, and \emph{cold}, as the median time to read the 15-column table plus the median warm time. Spark times are given without a cache, reading and computing in one action, and on a cached table, with session start and cache building timed separately for each size. \emph{In memory} (Pandas warm against Spark cached) isolates the computation. \emph{From disk} (Pandas cold against Spark without cache) includes the read, but it is not quite fair, because Pandas reads all 15 columns while Spark reads only the four or five a query needs. Each Pandas workload selects just the columns it uses before grouping, as Spark's optimizer does. Repeated Pandas runs vary by about \spreadPandas\% of the median and uncached Spark runs by \spreadSparkLo--\spreadSparkHi\%, so small differences should be read as ties. At 100\% the two engines give the same W1 and W2 results, and W3 results that agree within $\perfEqThree$.
 
 \begin{table*}[t]
 \caption{Median time (s) of five runs, excluding Spark session start (\initMin--\initMax{} s) and cache building. In memory: Pandas with the table loaded against Spark on a cached table. From disk: Pandas reading the 15-column table and computing against Spark reading Parquet within the action. Speedup $=T_\text{Pandas}/T_\text{Spark}$. Peak memory is per process over all workloads. Stopped: the Pandas process reached the \budget{} GB budget while loading the table, so no Pandas time was recorded at that size.}\label{tab:perf}
@@ -259,11 +303,29 @@ Size & Rows (M) & Pandas & Spark & Faster & Speedup & Pandas & Spark & Faster & 
 \caption{Scaling of time and memory. (a) Median time of W1 and W3 in memory: Pandas with the table loaded and Spark on a cached table. (b) The same from disk: Pandas reading the table and Spark reading Parquet within the action. (c) Peak memory of the whole process, including Spark's JVM; the cross marks the Pandas run stopped at the budget while loading the table.}\label{fig:perf}
 \end{figure*}
 
-\textbf{Results.} (1) \emph{Which is faster?} It depends on size, workload, and what we count (Table~\ref{tab:perf}, Figure~\ref{fig:perf}). \emph{In memory}, Pandas is faster on the grouped aggregation W1 up to 2$\times$ (11.6 million rows), the two tie at 100\% (\memWOneFullPd{} versus \memWOneFullSp{} s), and Spark wins from 4$\times$, by \memWOneSixteen{} times at 16$\times$. On the iterative W3, Pandas is faster up to 8$\times$ (46.2 million rows), by \memWThreeEightInv{} times there, and the two tie at 16$\times$ (\memWThreeSixPd{} versus \memWThreeSixSp{} s). \emph{From disk}, Spark wins W1 from 50\% (2.9 million rows) and is \spWOneSixteen{} times faster at 16$\times$. But reading the table is \loadShareSixteen\% of the Pandas time there, so this overstates Spark's computing advantage. On W3, Pandas is faster up to 2$\times$ and Spark from 4$\times$, by \spWThreeSixteen{} times at 16$\times$. (2) \emph{Does the ratio change with volume?} Yes, the speedup grows with rows everywhere: in memory it rises from \memWOneTen{} at 10\% to \memWOneSixteen{} at 16$\times$ for W1, and from \memWThreeTen{} to \memWThreeSixteen{} for W3. Pandas time grows in line with the rows, whereas Spark has a floor of roughly 0.1 to 0.6 s for W1 and 3 to 5 s for W3, which matters less as the data grow. (3) \emph{Spark overheads.} Starting a session takes \initMin--\initMax{} s, longer than any Pandas run, warm or cold, up to 2$\times$. Each W3 iteration also launches Spark jobs on small tables, a fixed cost that explains why W3 needs far more data than W1 before Spark catches up. Caching did not pay off at larger sizes. Building the cache took \cbFull{} s at 100\%, \cbSixteen{} s at 16$\times$, and \cbOom{} s at 32$\times$, and from 4$\times$ upwards the cached runs of all three workloads were slower than the uncached ones (Appendix~\ref{app:supp}, Table~\ref{tab:perfdetail}). A follow-up run rules out memory as the cause (Appendix Table~\ref{tab:cache}): even at 16$\times$ the cached table used \cdMemSixteen{} GB of Spark's \cdStorageMax{} GB of storage memory, every partition stayed cached, and nothing spilled to disk. Caching only the five columns W1 needs did not help either (\cdColsSixteen{} s, against \cdFullSixteen{} s on the full cache and \cdNoCacheSixteen{} s reading Parquet). The extra time therefore lies in scanning Spark's in-memory format, which here was slower than reading the compressed Parquet file (\cdParquetSixteen{} GB at 16$\times$); most likely a file that small stays in the operating system's file cache after the first read, so the uncached run hardly touches the disk either. At 100\% the cache still helped (\cdFullFull{} s against \cdNoCacheFull{} s). (4) \emph{Memory.} Pandas needs about \pdPerMillion{} GB more for every million rows, from \pdMemFull{} GB at 100\% to \pdMemSixteen{} GB at 16$\times$ (\lastRows{} million rows), where it still completed all three workloads. At 32$\times$ (\oomRows{} million rows) it hit the budget after \oomSecs{} s, while still reading the first copy of the table, so we have no Pandas times for that size. Spark ran every workload there with a peak of \spMemOom{} GB. Reading the full CSV with every field as a Python string went over the budget with both the C and the PyArrow parser. With Arrow-backed types, Pandas read it in \wzArrowTime{} s with a peak of \wzArrowPeak{} GB, against \wzSparkTime{} s and \wzSparkPeak{} GB for Spark, which does not keep the rows. The in-memory representation, not just the row count, decides whether a file fits. At small sizes Spark uses more memory than Pandas (\spMemTen{} versus \pdMemTen{} GB at 10\%), because the JVM reserves its heap up front. (5) \emph{When is Spark the better choice?} When a table gets close to the memory limit, and, on these four cores, for grouped aggregations from about 3 million rows when the data come from disk, or about 23 million rows when they are already in memory. For iterative work on data that fit in memory, Pandas was faster up to 46 million rows and tied at \lastRows{} million; there Spark's edge is that it keeps going past the memory limit. Pandas can only hold the raw CSV with Arrow-backed types, and then needs \wzMemRatio{} times Spark's peak memory. For interactive work on the 4.1-million-row usable sample, Pandas is simpler and quite fast enough.
+\textbf{(1) Which is faster?} It depends on size, workload, and what we count (Table~\ref{tab:perf}, Figure~\ref{fig:perf}). \emph{In memory}, Pandas is faster on the grouped aggregation W1 up to 2$\times$ (11.6 million rows), the two tie at 100\% (\memWOneFullPd{} versus \memWOneFullSp{} s), and Spark wins from 4$\times$, by \memWOneSixteen{} times at 16$\times$. On the iterative W3, Pandas is faster up to 8$\times$ (46.2 million rows), by \memWThreeEightInv{} times there, and the two tie at 16$\times$ (\memWThreeSixPd{} versus \memWThreeSixSp{} s). \emph{From disk}, Spark wins W1 from 50\% (2.9 million rows) and is \spWOneSixteen{} times faster at 16$\times$. But reading the table is \loadShareSixteen\% of the Pandas time there, so this overstates Spark's computing advantage. On W3, Pandas is faster up to 2$\times$ and Spark from 4$\times$, by \spWThreeSixteen{} times at 16$\times$.
+
+\textbf{(2) Does the ratio change with volume?} Yes, the speedup grows with rows everywhere: in memory it rises from \memWOneTen{} at 10\% to \memWOneSixteen{} at 16$\times$ for W1, and from \memWThreeTen{} to \memWThreeSixteen{} for W3. Pandas time grows in line with the rows, whereas Spark has a floor of roughly 0.1 to 0.6 s for W1 and 3 to 5 s for W3, which matters less as the data grow.
+
+\textbf{(3) Spark overheads.} Starting a session takes \initMin--\initMax{} s, longer than any Pandas run, warm or cold, up to 2$\times$. Each W3 iteration also launches Spark jobs on small tables, a fixed cost that explains why W3 needs far more data than W1 before Spark catches up.
+
+\textbf{(4) Caching did not pay off at larger sizes.} Building the cache took \cbFull{} s at 100\%, \cbSixteen{} s at 16$\times$, and \cbOom{} s at 32$\times$, and from 4$\times$ upwards the cached runs of all three workloads were slower than the uncached ones (Appendix~\ref{app:supp}, Table~\ref{tab:perfdetail}). A follow-up run rules out memory as the cause (Appendix Table~\ref{tab:cache}): even at 16$\times$ the cached table used \cdMemSixteen{} GB of Spark's \cdStorageMax{} GB of storage memory, every partition stayed cached, and nothing spilled to disk. Caching only the five columns W1 needs did not help either (\cdColsSixteen{} s, against \cdFullSixteen{} s on the full cache and \cdNoCacheSixteen{} s reading Parquet). The extra time therefore lies in scanning Spark's in-memory format, which here was slower than reading the compressed Parquet file (\cdParquetSixteen{} GB at 16$\times$); most likely a file that small stays in the operating system's file cache after the first read, so the uncached run hardly touches the disk either. At 100\% the cache still helped (\cdFullFull{} s against \cdNoCacheFull{} s).
+
+\textbf{(5) Memory.} Pandas needs about \pdPerMillion{} GB more for every million rows, from \pdMemFull{} GB at 100\% to \pdMemSixteen{} GB at 16$\times$ (\lastRows{} million rows), where it still completed all three workloads. At 32$\times$ (\oomRows{} million rows) it hit the budget after \oomSecs{} s, while still reading the first copy of the table, so we have no Pandas times for that size. Spark ran every workload there with a peak of \spMemOom{} GB. Reading the full CSV with every field as a Python string went over the budget with both the C and the PyArrow parser. With Arrow-backed types, Pandas read it in \wzArrowTime{} s with a peak of \wzArrowPeak{} GB, against \wzSparkTime{} s and \wzSparkPeak{} GB for Spark, which does not keep the rows. The in-memory representation, not just the row count, decides whether a file fits. At small sizes Spark uses more memory than Pandas (\spMemTen{} versus \pdMemTen{} GB at 10\%), because the JVM reserves its heap up front.
+
+\textbf{(6) When is Spark the better choice?} When a table gets close to the memory limit, and, on these four cores, for grouped aggregations from about 3 million rows when the data come from disk, or about 23 million rows when they are already in memory. For iterative work on data that fit in memory, Pandas was faster up to 46 million rows and tied at \lastRows{} million; there Spark's edge is that it keeps going past the memory limit. Pandas can only hold the raw CSV with Arrow-backed types, and then needs \wzMemRatio{} times Spark's peak memory. For interactive work on the 4.1-million-row usable sample, Pandas is simpler and quite fast enough.
 
 \section{Optional Predictive Analysis}
 
-\textbf{Target and use.} We predict denial among usable decisioned applications (base rate \baseRate\%). Its only use is as an alternative expected value in $O/E$, to test whether lender rankings depend on the coarse risk cells. \textbf{Inputs.} The risk-cell inputs: DTI ordinal, CLTV, loan-to-income, loan amount, income, loan type, and purpose. DTI and CLTV are the values the lender relied on, fixed during underwriting rather than when the application was submitted. We leave out post-decision fields (denial reasons, interest rate, costs, purchaser), race, ethnicity, sex, and age, and the lender and location identifiers that $O/E$ evaluates. \textbf{Models.} Logistic regression is the transparent baseline. We add histogram gradient boosting because denial does not move in one direction with the inputs (it is higher below 20\% DTI than at 20--30\%, and jumps at 50\%), and the inputs interact, which trees capture without hand-made terms. \textbf{Leakage.} Missing values depend on the outcome (loan term is missing in \missTermDen\% of denials and \missTermApp\% of approvals, DTI in \missDTIDen\% versus \missDTIApp\%), so the model uses only complete cases and imputes nothing. \textbf{Procedure.} We assign five folds by a hash of the lender identifier, so no lender is in both training and test data; all metrics are out of fold.
+\textbf{Target and use.} We predict denial among usable decisioned applications (base rate \baseRate\%). Its only use is as an alternative expected value in $O/E$, to test whether lender rankings depend on the coarse risk cells.
+
+\textbf{Inputs.} The risk-cell inputs: DTI ordinal, CLTV, loan-to-income, loan amount, income, loan type, and purpose. DTI and CLTV are the values the lender relied on, fixed during underwriting rather than when the application was submitted. We leave out post-decision fields (denial reasons, interest rate, costs, purchaser), race, ethnicity, sex, and age, and the lender and location identifiers that $O/E$ evaluates.
+
+\textbf{Models.} Logistic regression is the transparent baseline. We add histogram gradient boosting because denial does not move in one direction with the inputs (it is higher below 20\% DTI than at 20--30\%, and jumps at 50\%), and the inputs interact, which trees capture without hand-made terms.
+
+\textbf{Leakage.} Missing values depend on the outcome (loan term is missing in \missTermDen\% of denials and \missTermApp\% of approvals, DTI in \missDTIDen\% versus \missDTIApp\%), so the model uses only complete cases and imputes nothing.
+
+\textbf{Procedure.} We assign five folds by a hash of the lender identifier, so no lender is in both training and test data; all metrics are out of fold.
 
 \begin{table}[t]
 \caption{Out-of-fold performance on \nUsable{} applications, lender-grouped five-fold split. CITL: calibration in the large (mean predicted minus observed); slope: calibration slope.}\label{tab:pred}
@@ -282,22 +344,25 @@ Gradient boosting ranks applications better than logistic regression (ROC-AUC \a
 
 \section{Financial Interpretation and Limitations}
 
-For \emph{borrowers}, two levers matter: the lender, since risk-adjusted denial varies about four times as much between lenders as between markets, and the 50\% DTI threshold for conventional loans: at 50--60\%, conventional applications are denied at \drConvFiftySixty\% and FHA applications at \drFHAFiftySixty\%. In money terms, at the median income of conventional applicants at DTI 49 (\$\incDTIfortynine{},000 a year), one DTI point is about \$\dtiPointMonthly{} of monthly debt payments; that is what separates DTI 49, where \drConvFortynine\% of conventional applications are denied, from the 50--60 band. For \emph{lenders and analysts}, comparing raw denial rates across products is misleading. Most of the FHA gap is a matter of mix, but what is left changes sign across the risk distribution, and cash-out refinancing carries a large denial and price premium at the same measured ratios: the \psCOconvGap-point spread premium on the median conventional cash-out loan of \$\loanCOconv{},000 is about \$\dollarCOconv{} a year in interest. For \emph{policymakers}, the old 43\% Qualified Mortgage limit leaves only a \jumpConvFortythree-point step in conventional denials in 2024, while the 50\% GSE cap leaves a \jumpConvMain-point step. The LMI gap sits mostly within risk cells, so credit-score data would be needed before drawing any conclusion about how applicants are treated.
+\textbf{Borrowers.} Two levers matter: the lender, since risk-adjusted denial varies about four times as much between lenders as between markets, and the 50\% DTI threshold for conventional loans: at 50--60\%, conventional applications are denied at \drConvFiftySixty\% and FHA applications at \drFHAFiftySixty\%. In money terms, at the median income of conventional applicants at DTI 49 (\$\incDTIfortynine{},000 a year), one DTI point is about \$\dtiPointMonthly{} of monthly debt payments; that is what separates DTI 49, where \drConvFortynine\% of conventional applications are denied, from the 50--60 band.
 
-\textbf{Limitations.} (i) Credit score, the most important variable we do not have, differs systematically across products and tracts; FHA borrowers score about 60 points lower than GSE borrowers \citep{urban2026}. The rate components are therefore upper bounds on differences in treatment, and nothing here is evidence of discrimination. (ii) Applicants select themselves, and many weak applications are withdrawn before any decision; withdrawn applications have no DTI, so we cannot adjust them for risk. (iii) The risk cells use only three ratios; the model check eases but does not remove this concern. (iv) The data cover one year and only lenders that report to HMDA, and partially exempt lenders do not report DTI. (v) Performance was measured on one 4-core machine in local mode; a cluster would change Spark's fixed costs but not Pandas' memory limit. (vi) We do not compare outcomes by race, ethnicity, sex, or age. These fields are partly filled in by observation or left blank, and without credit scores a demographic gap could not be separated from credit differences. The LMI comparison is geographic and carries the same caveat.
+\textbf{Lenders and analysts.} Comparing raw denial rates across products is misleading. Most of the FHA gap is a matter of mix, but what is left changes sign across the risk distribution, and cash-out refinancing carries a large denial and price premium at the same measured ratios: the \psCOconvGap-point spread premium on the median conventional cash-out loan of \$\loanCOconv{},000 is about \$\dollarCOconv{} a year in interest.
+
+\textbf{Policymakers.} The old 43\% Qualified Mortgage limit leaves only a \jumpConvFortythree-point step in conventional denials in 2024, while the 50\% GSE cap leaves a \jumpConvMain-point step. The LMI gap sits mostly within risk cells, so credit-score data would be needed before drawing any conclusion about how applicants are treated.
+
+\textbf{Limitations.}
+\begin{enumerate}[label=(\roman*),leftmargin=1.8em,itemsep=0pt,topsep=2pt,parsep=0pt]
+\item \emph{Credit score}, the most important variable we do not have, differs systematically across products and tracts; FHA borrowers score about 60 points lower than GSE borrowers \citep{urban2026}. The rate components are therefore upper bounds on differences in treatment, and nothing here is evidence of discrimination.
+\item \emph{Self-selection.} Applicants select themselves, and many weak applications are withdrawn before any decision; withdrawn applications have no DTI, so we cannot adjust them for risk.
+\item \emph{Coarse cells.} The risk cells use only three ratios; the model check eases but does not remove this concern.
+\item \emph{Coverage.} The data cover one year and only lenders that report to HMDA, and partially exempt lenders do not report DTI.
+\item \emph{One machine.} Performance was measured on one 4-core machine in local mode; a cluster would change Spark's fixed costs but not Pandas' memory limit.
+\item \emph{Demographics.} We do not compare outcomes by race, ethnicity, sex, or age. These fields are partly filled in by observation or left blank, and without credit scores a demographic gap could not be separated from credit differences. The LMI comparison is geographic and carries the same caveat.
+\end{enumerate}
 
 \section{Conclusion}
 
 Across 4.1 million applications whose risk we can measure, observable risk explains most of the FHA--conventional denial gap on average but not its shape, explains almost none of the cash-out refinance gap, and reveals a sharp underwriting threshold at 50\% DTI rather than 43\%. The lender, not the metropolitan area, is the main source of variation in risk-adjusted denial and pricing. Two implementations built from one rules file reproduce every number we compared, either exactly or within $\eqMaxDiff\times10^{\eqMaxExp}$, and a third written without that file, together with the FFIEC's own aggregates, confirms them. On this machine Pandas stops between \lastRows{} and \oomRows{} million rows of a 15-column table, while loading it. Spark pays off for grouped aggregations from about 3 million rows read from disk or 23 million held in memory, and for anything that no longer fits in memory; on the iterative workload in memory, Pandas stayed faster up to 46 million rows.
-
-\bibliographystyle{ACM-Reference-Format}
-\bibliography{references}
-
-\appendix
-
-\section{Variables and Coding Rules Verified in the 2024 File}\label{app:rules}
-
-Table~\ref{tab:rules} lists the fields used for each sub-question and every coding rule applied to them.
 
 \begin{table*}[t]
 \caption{Variables and coding rules.}\label{tab:rules}
@@ -317,10 +382,6 @@ Thresholds & Lenders: $\ge$500 decisioned and $\ge$80\% usable; MSAs: $\ge$1,000
 \bottomrule
 \end{tabularx}
 \end{table*}
-
-\section{Supplementary Results}\label{app:supp}
-
-Figures~\ref{fig:heatmap}--\ref{fig:calibration} and Tables~\ref{tab:sens}--\ref{tab:perfdetail} support the main text.
 
 \begin{figure*}[t]
 \centering
@@ -389,12 +450,8 @@ Size & Load & W1 & W2 & W3 & Start & Build cache & W1 cached & W1 direct & W2 ca
 \end{tabular}
 \end{table*}
 
-\section{Additional Checks}\label{app:checks}
-
-Table~\ref{tab:jump} gives the DTI jump test of Section~\ref{sec:sqtwo}, Table~\ref{tab:dist} the summary statistics behind Figure~\ref{fig:products}b--d, Table~\ref{tab:kitagawa} the values behind Figure~\ref{fig:kitagawa}, Table~\ref{tab:eqvalues} a few quantities from both engines, and Table~\ref{tab:clean} the clean core table of Section~3. Table~\ref{tab:openend} shows the open-end sensitivity run of Section~3, a full rerun of the Pandas notebook with the closed-end filter widened to keep exempt open-end flags. Table~\ref{tab:cache} shows the cache diagnosis of Section~8, a rerun of W1 on the performance table with Spark's storage status read after each cache was built.
-
 \begin{table*}[t]
-\begin{minipage}[t]{0.55\textwidth}
+\begin{minipage}[t]{0.53\textwidth}
 \caption{DTI jump test: change in denial rate between adjacent DTI values minus the mean step within 36--49 (percentage points). $^{*}$ 95\% confidence interval excludes zero. Bunching: applications at DTI 49 divided by the mean at 44--48.}\label{tab:jump}
 \footnotesize
 \setlength{\tabcolsep}{3.2pt}
@@ -407,11 +464,23 @@ Scope & 49$\to$50--60 & 42$\to$43 & 44$\to$45 & 39$\to$40 & 46$\to$47 & Bunching
 \tabin{tables/jump.tex}
 \bottomrule
 \end{tabular}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.44\textwidth}
+\caption{Selected quantities computed independently by Pandas and Spark.}\label{tab:eqvalues}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\textwidth}{Lrrc}
+\toprule
+Quantity & Pandas & PySpark & Agree \\
+\midrule
+\tabin{tables/eq_values.tex}
+\bottomrule
+\end{tabularx}
 \end{minipage}
 \end{table*}
 
 \begin{table*}[t]
-\caption{Summary statistics of the financial variables, core sample; every value was computed in both Pandas and PySpark and agrees. Samples: originated loans (loan amount, interest rate), decisioned applications with valid values (income, CLTV, loan-to-income), and the pricing sample of Section~3 (rate spread, payment-to-income, loan costs). Payment-to-income is the monthly principal and interest payment over monthly income; interest rates outside $[0, 20]$\% and loan terms outside $(0, 480]$ months are excluded, as set in \texttt{rules.yaml}. The large SD of income comes from a few very high reported incomes (Table~\ref{tab:dq}).}\label{tab:dist}
+\caption{Summary statistics of the financial variables, core sample; every value was computed in both Pandas and PySpark and agrees. Payment-to-income: monthly principal and interest over monthly income. Interest rates outside $[0, 20]$\% and terms outside $(0, 480]$ months are excluded, as in \texttt{rules.yaml}. The large SD of income comes from a few very high reported incomes (Table~\ref{tab:dq}).}\label{tab:dist}
 \small
 \setlength{\tabcolsep}{3.4pt}
 \begin{tabular}{lrrrrrrrrrrrr}
@@ -455,20 +524,22 @@ Quantity & Main & With exempt flags \\
 \end{table*}
 
 \begin{table*}[t]
-\begin{minipage}[t]{0.5\textwidth}
-\caption{Selected quantities computed independently by Pandas and Spark.}\label{tab:eqvalues}
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\textwidth}{Lrrc}
+\begin{minipage}[t]{0.6\textwidth}
+\caption{Why caching did not pay off: W1 on the performance table, same machine as Table~\ref{tab:perf}. Full: all 15 columns cached; Cols: only the five W1 reads. Storage memory \cdStorageMax{} GB; times are medians of three runs.}\label{tab:cache}
+\scriptsize
+\setlength{\tabcolsep}{2.4pt}
+\begin{tabular}{lrrrrrrrrrr}
 \toprule
-Quantity & Pandas & PySpark & Agree \\
+& & \multicolumn{2}{c}{Build (s)} & \multicolumn{2}{c}{Memory (GB)} & Disk & Parts & \multicolumn{3}{c}{W1 time (s)} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){9-11}
+Size & Rows (M) & Full & Cols & Full & Cols & (GB) & cached & Parquet & Full & Cols \\
 \midrule
-\tabin{tables/eq_values.tex}
+\tabin{tables/cache.tex}
 \bottomrule
-\end{tabularx}
+\end{tabular}
 \end{minipage}\hfill
-\begin{minipage}[t]{0.46\textwidth}
-\caption{Clean core table kept as a notebook output: rows by state folder are listed in \texttt{results/clean/clean\_core\_manifest.csv}, column types and null counts in \texttt{clean\_core\_columns.csv}.}\label{tab:clean}
+\begin{minipage}[t]{0.37\textwidth}
+\caption{Clean core table kept as a notebook output; rows per state and column types are in \texttt{results/clean/}.}\label{tab:clean}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
 \begin{tabularx}{\textwidth}{Lr}
@@ -481,20 +552,22 @@ Item & Value \\
 \end{minipage}
 \end{table*}
 
-\begin{table*}[t]
-\caption{Why caching did not pay off: W1 on the 15-column performance table, Spark local mode, same machine as Table~\ref{tab:perf}. ``Full'' caches all 15 columns, ``W1 cols'' only the five W1 reads. Storage memory available: \cdStorageMax{} GB. Times are medians of three runs in seconds.}\label{tab:cache}
-\small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{lrrrrrrrrrr}
-\toprule
-& & \multicolumn{2}{c}{Cache build (s)} & \multicolumn{2}{c}{In memory (GB)} & On disk & Partitions & \multicolumn{3}{c}{W1 time (s)} \\
-\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){9-11}
-Size & Rows (M) & Full & W1 cols & Full & W1 cols & (GB) & cached & Parquet & Full cache & W1-col cache \\
-\midrule
-\tabin{tables/cache.tex}
-\bottomrule
-\end{tabular}
-\end{table*}
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\appendix
+
+\section{Variables and Coding Rules Verified in the 2024 File}\label{app:rules}
+
+Table~\ref{tab:rules} lists the fields used for each sub-question and every coding rule applied to them.
+
+\section{Supplementary Results}\label{app:supp}
+
+Figures~\ref{fig:heatmap}--\ref{fig:calibration} and Tables~\ref{tab:sens}--\ref{tab:perfdetail} support the main text.
+
+\section{Additional Checks}\label{app:checks}
+
+Table~\ref{tab:jump} gives the DTI jump test of Section~\ref{sec:sqtwo}, Table~\ref{tab:dist} the summary statistics behind Figure~\ref{fig:products}b--d, Table~\ref{tab:kitagawa} the values behind Figure~\ref{fig:kitagawa}, Table~\ref{tab:eqvalues} a few quantities from both engines, and Table~\ref{tab:clean} the clean core table of Section~3. Table~\ref{tab:openend} shows the open-end sensitivity run of Section~3, a full rerun of the Pandas notebook with the closed-end filter widened to keep exempt open-end flags. Table~\ref{tab:cache} shows the cache diagnosis of Section~8, a rerun of W1 on the performance table with Spark's storage status read after each cache was built.
 
 \section{Reproducibility}\label{app:repro}
 

@@ -1,0 +1,5 @@
+output,values,max_rel_diff,agree
+summary statistics,400,7.749554158042713e-12,True
+histograms,444,0.0,True
+loan amount by income band,105,0.0,True
+loan amount vs income correlation,15,1.487046218810082e-14,True

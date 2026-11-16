@@ -1,0 +1,41 @@
+{
+ "interest_rate_orig_numeric_out_of_range": 0,
+ "interest_rate_orig_not_numeric": 877,
+ "orig": 3660391,
+ "rules_version": "1.1",
+ "variables": {
+  "loan_amount": {
+   "sample": "orig",
+   "unit": "nghìn USD, khoản vay đã giải ngân"
+  },
+  "income": {
+   "sample": "decisioned & income > 0",
+   "unit": "nghìn USD/năm"
+  },
+  "interest_rate": {
+   "sample": "orig & interest_rate hợp lệ",
+   "unit": "%/năm"
+  },
+  "rate_spread": {
+   "sample": "pricing",
+   "unit": "điểm phần trăm so với APOR"
+  },
+  "cltv": {
+   "sample": "decisioned & cltv hợp lệ",
+   "unit": "%"
+  },
+  "lti": {
+   "sample": "decisioned & income > 0",
+   "unit": "lần thu nhập năm"
+  },
+  "pti": {
+   "sample": "pricing & lãi suất, kỳ hạn hợp lệ & income > 0",
+   "unit": "% thu nhập tháng (chỉ gốc + lãi)"
+  },
+  "cost_share": {
+   "sample": "pricing & total_loan_costs hợp lệ",
+   "unit": "% loan amount"
+  }
+ },
+ "seconds": 264.0
+}

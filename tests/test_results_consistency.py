@@ -109,3 +109,20 @@ def test_independent_lender_oe_matches_pandas():
     assert d["agree"].all()
     s = pd.read_csv(os.path.join(RES, "independent", "independent_vs_pandas_summary.csv"))
     assert len(d) == s["values"].sum()
+
+
+def test_descriptive_distributions_agree_and_match_table2():
+    e = pd.read_csv(os.path.join(RES, "descriptive", "pandas_vs_spark.csv"))
+    assert e["agree"].all() and (e["max_rel_diff"] <= 1e-9).all()
+    d = pd.read_csv(os.path.join(RES, "descriptive", "summary_stats.csv")).set_index(["variable", "group"])
+    t2 = P("sq1_loan_amount_originated_by_type").set_index("type")
+    for t in ["conventional", "FHA", "VA", "USDA"]:
+        assert d.loc[("loan_amount", t), "p50"] * 1000 == pytest.approx(t2.loc[t, "median"])
+        assert d.loc[("loan_amount", t), "n"] == t2.loc[t, "n"]
+    rs = P("sq2_rate_spread_by_type").set_index("type")
+    for t in ["conventional", "FHA", "VA", "USDA"]:
+        assert d.loc[("rate_spread", t), "mean"] == pytest.approx(rs.loc[t, "mean"], rel=1e-9)
+    h = pd.read_csv(os.path.join(RES, "descriptive", "histograms.csv"))
+    for v, var in [("loan_amount", "loan_amount"), ("interest_rate", "interest_rate")]:
+        tot = h[(h.variable == v) & (h.group != "all")]["n"].sum()
+        assert tot == d.loc[(var, "all"), "n"]

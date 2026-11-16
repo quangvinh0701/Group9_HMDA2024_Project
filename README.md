@@ -47,6 +47,7 @@ Comments and notebook text are in Vietnamese; the report and this file are in En
 - Source: FFIEC/CFPB HMDA data publication, https://ffiec.cfpb.gov/data-publication/
 - Dataset: **2024 One-Year National Loan-Level Dataset** (Loan/Application Records, LAR), file
   `2024_public_lar_one_year_csv.csv`, 4.64 GB, 12,259,199 records, 99 fields.
+  Download: https://files.ffiec.cfpb.gov/static-data/one-year/2024/2024_public_lar_one_year_csv.zip (unzip to get the CSV).
 - Lender table: 2024 Transmittal Sheet,
   https://files.ffiec.cfpb.gov/static-data/one-year/2024/2024_public_ts_one_year_csv.zip
 - Documentation: https://ffiec.cfpb.gov/documentation/

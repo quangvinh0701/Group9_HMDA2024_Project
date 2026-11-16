@@ -1,0 +1,44 @@
+column,type,nulls,source
+row_id,int64,0,"raw HMDA field, kept as text"
+lei,string,0,"raw HMDA field, kept as text"
+county_code,string,0,"raw HMDA field, kept as text"
+action_taken,string,0,"raw HMDA field, kept as text"
+loan_type,string,0,"raw HMDA field, kept as text"
+loan_purpose,string,0,"raw HMDA field, kept as text"
+rate_spread,string,0,"raw HMDA field, kept as text"
+income,string,0,"raw HMDA field, kept as text"
+loan_amount,string,0,"raw HMDA field, kept as text"
+decisioned,bool,0,derived (rules.yaml 1.1)
+denied,bool,0,derived (rules.yaml 1.1)
+orig,bool,0,derived (rules.yaml 1.1)
+y,double,0,derived (rules.yaml 1.1)
+dti_ordinal,double,1511996,derived (rules.yaml 1.1)
+cltv,double,1486063,derived (rules.yaml 1.1)
+cltv_valid,bool,0,derived (rules.yaml 1.1)
+income_num,double,280709,derived (rules.yaml 1.1)
+income_is_na,bool,0,derived (rules.yaml 1.1)
+loan_amount_num,double,0,derived (rules.yaml 1.1)
+lti,double,337561,derived (rules.yaml 1.1)
+tract_ratio,double,56738,derived (rules.yaml 1.1)
+lmi,bool,56738,derived (rules.yaml 1.1)
+rs_num,double,2020850,derived (rules.yaml 1.1)
+rs_valid,bool,0,derived (rules.yaml 1.1)
+rs_out_of_range,bool,0,derived (rules.yaml 1.1)
+term_num,double,38464,derived (rules.yaml 1.1)
+in_universe,bool,0,derived (rules.yaml 1.1)
+state_missing,bool,0,derived (rules.yaml 1.1)
+county_valid,bool,0,derived (rules.yaml 1.1)
+msa,string,0,derived (rules.yaml 1.1)
+type,string,0,derived (rules.yaml 1.1)
+purpose,string,0,derived (rules.yaml 1.1)
+sample_bucket,int64,0,derived (rules.yaml 1.1)
+dr1,int32,0,derived (rules.yaml 1.1)
+dr2,int32,0,derived (rules.yaml 1.1)
+dr3,int32,0,derived (rules.yaml 1.1)
+dr4,int32,0,derived (rules.yaml 1.1)
+dti_band,string,1511996,derived (rules.yaml 1.1)
+cltv_band,string,1487088,derived (rules.yaml 1.1)
+lti_band,string,337561,derived (rules.yaml 1.1)
+usable,bool,0,derived (rules.yaml 1.1)
+pricing,bool,0,derived (rules.yaml 1.1)
+state_code,string,0,"raw HMDA field, kept as text"

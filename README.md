@@ -12,6 +12,8 @@ back from the raw data.
 ```
 README.md
 requirements.txt
+requirements-dev.txt           extra packages for the tests and the SQL check (pytest, duckdb)
+pytest.ini
 report.pdf                     the technical report (ACM large two-column format)
 config/
   rules.yaml                   all filters, code mappings, bands, thresholds and formulas (version 1.1, frozen)
@@ -23,17 +25,29 @@ src/
   check_equivalence.py         step 3: compares the outputs of steps 1 and 2
   perf_pipeline.py             step 4: the performance and scalability experiment
   build_report_assets.py       step 5: turns results/ into the numbers, tables and figures of the report
+  independent_check.py         check: the main numbers again in DuckDB SQL, with every rule written out by hand
+  compare_data_browser.py      check: record counts and loan-amount sums against the FFIEC Data Browser
+  export_clean_core.py         keeps the clean core table as Parquet and compares it row by row with Pandas
+  sensitivity_open_end.py      sensitivity run: adds back records whose open-end flag is exempt
+  perf_cache_diagnosis.py      why the Spark cache was slower at large sizes (storage status, column-only cache)
+  pred_subgroups.py            calibration of the out-of-fold predictions by loan type, purpose, tract and DTI band
   py_to_ipynb.py               turns the .py files (cells marked with "# %%") into notebooks
   gen_synth.py                 makes a fake file with the HMDA schema, which we used to test the code first
   columns.txt                  the 99 field names in file order (used by gen_synth.py)
 notebooks/                     the notebooks we ran on Kaggle on 15 November 2026, with all their outputs
                                (pandas, pyspark, performance, check_equivalence). Their code is the same as in src/.
                                HMDA_convert contains the code of step 0.
+  extra/                       the four check notebooks run on 16 November 2026 (code only; see section 8)
+tests/                         pytest suite (section 6)
 results/
   pandas/, spark/              every result table of the two pipelines, including eq_*.csv and key_numbers.json
   equivalence/                 the Pandas vs PySpark comparison (summary and each compared value)
   perf/                        timings of every run, medians, peak memory, machine details
-  external/                    counts from the official HMDA Data Browser, used only to check that we read the file correctly
+  external/                    counts and loan-amount sums from the official HMDA Data Browser, and our comparison with them
+  independent/                 outputs of the DuckDB check, its comparison with Pandas, and loan and income medians
+  sensitivity/                 the open-end exempt run compared with the main run
+  predictive/                  calibration of the out-of-fold predictions by subgroup
+  clean/                       description of the clean core table: rows per state, column types, row-by-row check
 figures/
   pandas/                      figures made by the Pandas notebook
   perf/                        the two performance figures, drawn from results/perf with the notebook's plotting code
@@ -104,6 +118,20 @@ The performance script also reads a few optional settings: `PERF_SIZES` (for exa
    datasets and the output of `HMDA_convert` as input, set the accelerator to none and internet off, and Run All.
 3. The equivalence notebook also needs the outputs of the Pandas and PySpark notebooks as input.
 
+### Checks (run after steps 1 to 3)
+
+```
+pip install -r requirements-dev.txt
+python src/independent_check.py data/hmda_2024_raw.parquet output/results/pandas output/results/independent
+python src/compare_data_browser.py --fetch      # needs Internet; without --fetch it uses results/external/
+python src/pred_subgroups.py output/results/pandas/pred_oof.parquet data/hmda_2024_raw.parquet output/results/predictive
+python src/sensitivity_open_end.py             # a second Pandas run with exempt open-end flags kept
+python src/perf_cache_diagnosis.py             # Spark only, about 11 minutes
+python src/export_clean_core.py                # writes output/clean_core/ and output/results/clean/
+pytest                                         # fast tests, a few seconds
+pytest -m slow                                 # runs the pipelines on a synthetic file, about 4 minutes
+```
+
 ### Step 5: rebuild the report
 
 ```
@@ -136,9 +164,10 @@ differ from the Data Browser or if the two engines disagree. Run on this folder,
 **Prepared analytical data.** The PySpark pipeline saves the core sample as Parquet in `$HMDA_WORK/clean_core`. The
 table holds the row identifier, nine raw fields as published and all derived fields with proper types (doubles,
 booleans, text labels). It is partitioned by `state_code`: there are 55 values and most geographic summaries group by
-state, whereas county, with more than 3,000 values, would create a large number of small files. The table is rebuilt
-from the raw Parquet file and the rules on every run, so we do not store it here. The Pandas pipeline builds the same
-table in memory.
+state, whereas county, with more than 3,000 values, would create a large number of small files. The Pandas pipeline
+builds the same table in memory. `src/export_clean_core.py` keeps the Spark-written table as a notebook output on
+Kaggle (`clean_core/`, too large for this repository) and checks it against the Pandas table row by row and column by
+column; `results/clean/` describes it (rows per state folder, column types and null counts, the comparison).
 
 Both pipelines read every definition from `config/rules.yaml`, so they apply the same cleaning rules. The files in
 `config/` are the exact copies we used on Kaggle.
@@ -148,15 +177,21 @@ Both pipelines read every definition from `config/rules.yaml`, so they apply the
 | Report item | Result files (in `results/pandas/` unless another folder is given; the PySpark run writes the same names to `results/spark/`, see section 9) |
 |---|---|
 | Table 1, data quality | `dq_summary.csv`, `dq_special_codes.csv`, `dq_missing_by_action.csv`, `dq_field_profile.csv` |
+| Data Browser check (Section 2) | `results/external/data_browser_action_taken_2024.json`, `data_browser_slices_2024.csv`, `data_browser_comparison.csv` |
 | Table 2 and Figure 1, products | `sq1_outcomes_by_type.csv`, `sq1_loan_amount_originated_by_type.csv`, `sq2_rate_spread_by_type.csv`, `sq1_denial_type_x_purpose.csv` |
 | Figure 2 and Table 3, DTI | `sq2_denial_by_dti_19.csv`, `sq2_dti_jump_table.csv`, `sq2_dti_jump_test.csv`, `sq2_dti_bunching.csv` |
 | Low-DTI check | `sq2_low_dti_profile.csv`, `sq2_low_dti_reasons.csv`, `sq2_low_dti_by_type_purpose.csv` |
-| Table 4, decomposition; pricing | `sq2_kitagawa_denial.csv`, `sq3_lmi_kitagawa.csv`, `sq2_kitagawa_rate_spread.csv`, `sq2_risk_cells.csv` |
+| Figure 3 and Table 12, decomposition; pricing | `sq2_kitagawa_denial.csv`, `sq3_lmi_kitagawa.csv`, `sq2_kitagawa_rate_spread.csv`, `sq2_risk_cells.csv` |
 | Geography | `sq3_state_oe.csv`, `sq3_msa_oe.csv`, `sq3_lmi_oe.csv`, `sq3_state_separate_lines.csv` |
-| Figure 3 and lender results | `sq4_lender_oe.csv`, `sq4_oe_by_agency.csv`, `sq4_two_way.csv`, `sq4_sensitivity.csv`, `sq4_spread_dispersion.csv`, `sq4_hhi_msa.csv` |
-| Tables 5 and 6, correctness | `results/equivalence/equivalence_summary.csv`, `equivalence_details.csv` |
-| Table 7, Figure 4, Table 12, performance | `results/perf/perf_summary.csv`, `perf_memory.csv`, `perf_runs.csv` |
-| Table 8, prediction | `results/pandas/pred_metrics.csv`, `pred_lender_oe_comparison.csv`, `pred_calibration_deciles.csv`; the MLlib version is in `results/spark/key_numbers.json` and `pred_mllib_vs_sklearn_by_purpose.csv` |
+| Figure 4 and lender results | `sq4_lender_oe.csv`, `sq4_oe_by_agency.csv`, `sq4_two_way.csv`, `sq4_sensitivity.csv`, `sq4_spread_dispersion.csv`, `sq4_hhi_msa.csv` |
+| Tables 4 and 14, Pandas vs PySpark | `results/equivalence/equivalence_summary.csv`, `equivalence_details.csv` |
+| Table 5, the three checks | `results/equivalence/`, `results/independent/independent_vs_pandas_summary.csv`, `results/external/data_browser_comparison.csv` |
+| Table 6, Figure 5, Table 11, performance | `results/perf/perf_summary.csv`, `perf_memory.csv`, `perf_runs.csv` |
+| Table 16, cache diagnosis | `results/perf/perf_cache_diagnosis.csv` |
+| Table 7, prediction, and the subgroup calibration | `pred_metrics.csv`, `pred_lender_oe_comparison.csv`, `pred_calibration_deciles.csv`, `results/predictive/pred_subgroups.csv`; the MLlib version is in `results/spark/key_numbers.json` and `pred_mllib_vs_sklearn_by_purpose.csv` |
+| Table 13, open-end sensitivity | `results/sensitivity/open_end_exempt.csv`, `open_end_exempt_funnel.csv` |
+| Table 15, clean core table | `results/clean/clean_core_summary.json`, `clean_core_manifest.csv`, `clean_core_columns.csv`, `clean_core_pandas_vs_spark.csv` |
+| Dollar amounts in Section 10 | `results/independent/ind_magnitudes.json` |
 | Single numbers quoted in the text | `key_numbers.json` |
 
 ## 6. Checking that Pandas and PySpark agree
@@ -168,6 +203,20 @@ rates may differ by at most 1e-9 in relative terms, and results of the iterative
 
 For the files in this folder, all 1,684 values agree and the largest relative difference is 2.5e-12
 (`results/equivalence/equivalence_summary.md`). The equivalence notebook on Kaggle reached the same result.
+
+Agreement between two pipelines that read the same rules file does not show that the rules are applied correctly, so
+there are three further checks:
+
+- **A third implementation.** `src/independent_check.py` recomputes the main numbers in DuckDB SQL without reading
+  `rules.yaml`: every filter, code mapping, band edge and the 30-case fallback is written out in the SQL. All 2,654
+  values compared with Pandas agree (largest relative difference 7.7e-13;
+  `results/independent/independent_vs_pandas_summary.csv`).
+- **The FFIEC's own aggregates.** `src/compare_data_browser.py` compares record counts and summed loan amounts for
+  every combination of action taken with loan type, purpose, lien status, construction method and state (544 slices)
+  with the HMDA Data Browser. All agree exactly (`results/external/data_browser_comparison.csv`).
+- **Tests.** `pytest` checks the rules file, recomputes headline numbers (tau, the DTI jump, the Kitagawa identity)
+  from the saved tables, plants errors in one engine's output to make sure `check_equivalence.py` catches them, and,
+  with `-m slow`, runs Pandas, PySpark and the SQL check end to end on a synthetic file.
 
 ## 7. Performance experiment
 
@@ -186,12 +235,20 @@ one warm-up run. Spark session start, cache building, and cached and uncached ru
 - `results/perf/perf_memory.csv`: peak memory, and the step at which a run was stopped
 - `results/perf/perf_meta.json`: hardware and software, the sizes, and the check that both engines agree at 100%
 - `results/perf/perf_log_summary.md`: the same information as readable tables
+- `results/perf/perf_cache_diagnosis.csv`: why cached Spark runs were slower from 4 copies up. The cached table always
+  fitted in Spark's storage memory (2.6 GB of 12.1 GB at 16 copies, nothing on disk), and caching only the five
+  columns W1 reads did not help, so the cost is the scan of Spark's in-memory format rather than memory pressure.
 
 ## 8. Where the results come from
 
-Everything in `results/` comes from a single Kaggle run on 15 November 2026 (rules 1.1, code as in `src/`).
-`results/equivalence/` can be recomputed from `results/pandas/` and `results/spark/` with `src/check_equivalence.py`
-and gives the same files as the equivalence notebook on Kaggle.
+The main results (`pandas/`, `spark/`, `perf/`, `equivalence/`) come from a single Kaggle run on 15 November 2026
+(rules 1.1, code as in `src/`). `results/equivalence/` can be recomputed from `results/pandas/` and `results/spark/`
+with `src/check_equivalence.py` and gives the same files as the equivalence notebook on Kaggle.
+
+The checks were run on Kaggle on 16 November 2026 in four more notebooks (`notebooks/extra/`): `HMDA_extra_checks`
+(DuckDB check, Data Browser slices, subgroup calibration), `HMDA_sensitivity_open_end`, `HMDA_cache_diagnosis` and
+`HMDA_clean_core_export`. Their small output files were copied into `results/` and checked against the MD5 sums the
+notebooks printed.
 
 ## 9. What is not included
 
@@ -201,5 +258,8 @@ and gives the same files as the equivalence notebook on Kaggle.
   `pred_lender_oe_comparison_spark.csv`, about 500 KB together). The report uses the Pandas versions in
   `results/pandas/`; the Spark side of these tables is compared through `key_numbers.json` and
   `eq_6_top50_lenders.csv`. The PySpark notebook writes them when it runs.
+- From the checks: the clean core table itself (a Kaggle notebook output, see section 5), the per-lender output
+  of the DuckDB check (`ind_oe_lender.csv`) and the full value-by-value comparison (`independent_vs_pandas.csv`);
+  the summary of that comparison is included.
 - Two per-record prediction files (`pred_oof.parquet`, about 85 MB, and its MLlib counterpart, about 50 MB); the
   pipelines create them again when run.

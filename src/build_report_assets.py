@@ -7,6 +7,9 @@ Every number printed in the report comes from the Kaggle run outputs:
   results/perf         (performance notebook)
   results/equivalence  (equivalence notebook)
   results/external     (FFIEC Data Browser counts, verification only)
+  results/independent  (DuckDB re-implementation, verification and dollar magnitudes)
+  results/predictive   (calibration of the out-of-fold predictions by subgroup)
+  results/sensitivity  (open-end exempt sensitivity run)
 
 Usage: python build_report_assets.py RESULTS_DIR OUT_DIR
 (RESULTS_DIR is either the raw Kaggle download layout shown above or the repository's results/ folder;
@@ -681,6 +684,130 @@ _jt = rd(os.path.join(P, "sq2_dti_jump_test.csv"))
 _jf = _jt[_jt["scope"].astype(str) == "2"].set_index("jump")["excess"]
 mac("jumpFHAFortythree", pp(_jf["42 -> 43"], 2)); mac("jumpFHAFortyfive", pp(_jf["44 -> 45"], 2))
 
+# ---- checks added after the first submission review (16 Nov 2026)
+def sci(x):                 # mantissa and exponent for $m\times10^{e}$
+    m_, e_ = f"{x:.1e}".split("e")
+    return m_, str(int(e_))
+
+
+IND, EXT = os.path.join(RES, "independent"), os.path.join(RES, "external")
+# (a) third implementation in DuckDB SQL with every rule hard-coded, compared with Pandas
+isum = rd(os.path.join(IND, "independent_vs_pandas_summary.csv"))
+assert isum["agree"].all(), isum[~isum["agree"]]
+mac("indValues", fmt_int(isum["values"].sum())); mac("indQuantities", fmt_int(len(isum)))
+_m, _e = sci(isum["max_rel_diff"].max()); mac("indMaxDiff", _m); mac("indMaxExp", _e)
+# (b) slices of the whole file against the FFIEC Data Browser: record counts and summed loan amounts
+dbc = rd(os.path.join(EXT, "data_browser_comparison.csv"), keep_default_na=False)
+assert dbc["agree"].astype(str).eq("True").all()
+mac("dbSlices", fmt_int(len(dbc))); mac("dbDims", fmt_int(dbc["dimension"].nunique()))
+mac("dbStates", fmt_int(dbc.loc[dbc["dimension"] == "states", "value"].nunique()))
+mac("dbLoanTrillion", fmt(dbc.loc[dbc["dimension"] == "loan_types", "sum_db"].astype(float).sum() / 1e12, 2))
+# (c) automated tests
+_tests = {f: open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", f)).read()
+          for f in os.listdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests")) if f.startswith("test_")}
+mac("nTests", fmt_int(sum(t.count("\ndef test_") for t in _tests.values())))
+mac("nTestsSlow", fmt_int(sum(t.count("@pytest.mark.slow") for t in _tests.values())))
+# (d) open-end exempt sensitivity (planned in the proposal): add back records whose open-end flag is 1111
+oe_ = rd(os.path.join(RES, "sensitivity", "open_end_exempt.csv")).set_index("key")
+of_ = rd(os.path.join(RES, "sensitivity", "open_end_exempt_funnel.csv")).set_index("step")
+_add = of_["sensitivity"] - of_["main"]
+assert int(_add["closed_end"]) == int(MAC["nOpenEndExempt"].replace(",", ""))
+assert int(of_.loc["principal_residence", "main"]) == int(oe_.loc["core", "main"])
+mac("oeAddBusiness", fmt_int(_add["non_business"])); mac("oeAddCore", fmt_int(_add["principal_residence"]))
+mac("oeAddDecisioned", fmt_int(_add["decisioned"])); mac("oeAddUsable", fmt_int(_add["usable"]))
+_stat = oe_.drop(index=["core", "decisioned", "usable", "lenders_in_both", "spearman_lender_oe_main_vs_sens"])
+_m, _e = sci(_stat["change"].abs().max()); mac("oeMaxAbs", _m); mac("oeMaxAbsExp", _e)
+mac("oeSpearman", fmt(oe_.loc["spearman_lender_oe_main_vs_sens", "sensitivity"], 4))
+_m, _e = sci(1 - oe_.loc["spearman_lender_oe_main_vs_sens", "sensitivity"]); mac("oeRhoGap", _m); mac("oeRhoGapExp", _e)
+mac("oeNStats", fmt_int(len(_stat)))
+# (e) why caching did not pay off: storage status of the cached table and W1 times
+cdg = rd(os.path.join(PF, "perf_cache_diagnosis.csv")).set_index("size")
+for v in ("full", "w1cols"):
+    assert (cdg[f"cache_{v}_disk_gb"] == 0).all()
+    assert (cdg[f"cache_{v}_partitions_cached"] == cdg[f"cache_{v}_partitions"]).all()
+big = [x for x in cdg.index if x != "100%"]
+assert (cdg.loc[big, "w1_cache_full_s"] > cdg.loc[big, "w1_nocache_s"]).all()
+assert (cdg.loc[big, "w1_cache_w1cols_s"] > cdg.loc[big, "w1_nocache_s"]).all()
+assert cdg.loc["100%", "w1_cache_full_s"] < cdg.loc["100%", "w1_nocache_s"]
+mac("cdStorageMax", fmt(cdg["storage_max_gb"].iloc[0], 1))
+mac("cdMemSixteen", fmt(cdg.loc["x16", "cache_full_mem_gb"], 1)); mac("cdColsMemSixteen", fmt(cdg.loc["x16", "cache_w1cols_mem_gb"], 1))
+mac("cdParquetSixteen", fmt(cdg.loc["x16", "parquet_gb"], 1))
+mac("cdNoCacheSixteen", fmt(cdg.loc["x16", "w1_nocache_s"], 1)); mac("cdFullSixteen", fmt(cdg.loc["x16", "w1_cache_full_s"], 1))
+mac("cdColsSixteen", fmt(cdg.loc["x16", "w1_cache_w1cols_s"], 1))
+mac("cdNoCacheFull", fmt(cdg.loc["100%", "w1_nocache_s"], 2)); mac("cdFullFull", fmt(cdg.loc["100%", "w1_cache_full_s"], 2))
+mac("cdColsBuildSixteen", fmt(cdg.loc["x16", "cache_w1cols_build_s"], 0))
+# (f) calibration of the out-of-fold predictions within subgroups
+psg = rd(os.path.join(RES, "predictive", "pred_subgroups.csv")).set_index(["dimension", "group"])
+_lmi, _unk = psg.loc[("tract", "LMI tract")], psg.loc[("tract", "tract unknown")]
+mac("predLMIobs", pct(_lmi["observed"])); mac("predLMIgb", pct(_lmi["gbt_predicted"])); mac("predLMIlr", pct(_lmi["lr_predicted"]))
+mac("predLMIcitlGB", pp(_lmi["gbt_citl"])); mac("predLMIcitlLR", pp(_lmi["lr_citl"]))
+_oth = psg.loc[("tract", "other tract")]
+mac("predOthcitlGB", pp(_oth["gbt_citl"]))
+mac("predUnkN", fmt_int(_unk["n"])); mac("predUnkObs", pct(_unk["observed"])); mac("predUnkGB", pct(_unk["gbt_predicted"]))
+_reg = psg[psg.index.get_level_values(0).isin(["loan_type", "purpose", "dti_band"])].drop(index=("purpose", "not applicable"))
+mac("predMaxCITL", fmt(100 * _reg[["lr_citl", "gbt_citl"]].abs().max().max(), 1))
+mac("predAUCminGB", fmt(_reg["gbt_auc"].min(), 2)); mac("predAUCmaxGB", fmt(_reg["gbt_auc"].max(), 2))
+# (g) dollar magnitudes for the financial interpretation
+mg_ = json.load(open(os.path.join(IND, "ind_magnitudes.json")))
+mac("loanCOconv", fmt_int(mg_["median_loan_conv_cashout"] / 1000)); mac("loanPurchConv", fmt_int(mg_["median_loan_conv_purchase"] / 1000))
+mac("dollarCOconv", fmt_int(round(cv.gap / 100 * mg_["median_loan_conv_cashout"], -1)))
+mac("incDTIfortynine", fmt_int(mg_["median_income_conv_dti49"]))
+mac("dtiPointMonthly", fmt_int(mg_["median_income_conv_dti49"] * 1000 * 0.01 / 12))
+mac("nConvDTIfortynine", fmt_int(mg_["n_conv_dti49"]))
+
+# verification table (Section 7): three implementations and the external source
+_eqs = rd(os.path.join(EQ, "equivalence_summary.csv"))
+_eqv = int(MAC["eqTotal"].replace(",", ""))
+lines = [
+    rf"Pandas vs.\ PySpark, one rules file & {MAC['eqTotal']} & ${MAC['eqMaxDiff']}\times10^{{{MAC['eqMaxExp']}}}$ & yes \\",
+    rf"DuckDB SQL, rules hard-coded, vs.\ Pandas & {MAC['indValues']} & ${MAC['indMaxDiff']}\times10^{{{MAC['indMaxExp']}}}$ & yes \\",
+    rf"FFIEC Data Browser: counts and loan-amount sums & {MAC['dbSlices']} slices & 0 & yes \\",
+]
+open(os.path.join(TAB, "verify.tex"), "w").write("\n".join(lines) + "\n")
+
+# cache diagnosis table (appendix)
+lines = []
+for sz, d in cdg.iterrows():
+    lines.append(f"{_lab(sz)} & {d.rows / 1e6:.1f} & {d.cache_full_build_s:.1f} & {d.cache_w1cols_build_s:.1f} & "
+                 f"{d.cache_full_mem_gb:.2f} & {d.cache_w1cols_mem_gb:.2f} & {d.cache_full_disk_gb:.0f} & "
+                 f"{int(d.cache_full_partitions_cached)}/{int(d.cache_full_partitions)} & "
+                 f"{d.w1_nocache_s:.2f} & {d.w1_cache_full_s:.2f} & {d.w1_cache_w1cols_s:.2f} \\\\")
+open(os.path.join(TAB, "cache.tex"), "w").write("\n".join(lines) + "\n")
+
+# clean core table kept as a notebook output, compared row by row with the Pandas table
+_cs = os.path.join(RES, "clean", "clean_core_summary.json")
+if os.path.exists(_cs):
+    cc_ = json.load(open(_cs))
+    assert cc_["all_agree"] and cc_["rows"] == int(MAC["nCore"].replace(",", ""))
+    mac("cleanRows", fmt_int(cc_["rows"])); mac("cleanCols", fmt_int(cc_["columns"]))
+    mac("cleanParts", fmt_int(cc_["partitions"])); mac("cleanMB", fmt_int(cc_["size_mb"]))
+    mac("cleanCmp", fmt_int(cc_["columns_compared_with_pandas"]))
+    _cd = rd(os.path.join(RES, "clean", "clean_core_columns.csv"))
+    _raw = int((_cd["source"].str.startswith("raw") & (_cd["column"] != "row_id")).sum())
+    lines = [f"Rows & {fmt_int(cc_['rows'])} \\\\",
+             f"Columns: row id, raw text, derived & {cc_['columns']} (1, {_raw}, {cc_['columns'] - _raw - 1}) \\\\",
+             f"State folders / files & {cc_['partitions']} / {cc_['files']} \\\\",
+             f"Size on disk (MB) & {fmt(cc_['size_mb'], 0)} \\\\",
+             f"Columns compared with Pandas, row by row & {cc_['columns_compared_with_pandas']} \\\\",
+             f"Cells that differ & 0 \\\\",
+             f"Rules version & {cc_['rules_version']} \\\\"]
+    open(os.path.join(TAB, "clean.tex"), "w").write("\n".join(lines) + "\n")
+
+# open-end sensitivity table (appendix)
+OE_LAB = [("decisioned", "Decisioned applications", "int"), ("usable", "Usable applications", "int"),
+          ("kitagawa_loan_type_2v1_gap", "FHA$-$conventional denial gap", "pp"),
+          ("kitagawa_loan_type_2v1_composition", "\\quad composition part", "pp"),
+          ("kitagawa_loan_purpose_32v1_rate", "Cash-out$-$purchase gap, rate part", "pp"),
+          ("jump_1_49_to_5060_excess", "Conventional DTI jump 49$\\to$50--60", "pp"),
+          ("pricing_conventional_32v1_gap", "Cash-out spread premium (points)", "f2"),
+          ("tau_msa", "$\\tau$, MSAs", "f3"), ("tau_lender", "$\\tau$, lenders", "f3"),
+          ("twoway_signal_sd_ratio", "Lender/MSA signal SD ratio", "f2")]
+def _f(v, k):
+    return {"int": fmt_int(v), "pp": pp(v, 2), "f2": fmt(v, 2), "f3": fmt(v, 3)}[k]
+lines = [f"{lab} & {_f(oe_.loc[k, 'main'], kind)} & {_f(oe_.loc[k, 'sensitivity'], kind)} \\\\" for k, lab, kind in OE_LAB]
+lines.append(f"Spearman $\\rho$ of lender $O/E$ & & {MAC['oeSpearman']} \\\\")
+open(os.path.join(TAB, "open_end.tex"), "w").write("\n".join(lines) + "\n")
+
 # ---------------------------------------------------------------- write macros
 with open(os.path.join(OUT, "numbers.tex"), "w") as fh_:
     fh_.write("% generated by build_report_assets.py from the Kaggle run outputs; do not edit by hand\n")
@@ -833,6 +960,36 @@ a2.set_title("(c) Peak memory per process")
 a2.legend(frameon=False, fontsize=6.5, loc="center left")
 fig.tight_layout(w_pad=0.8)
 fig.savefig(os.path.join(FIG, "fig_perf.pdf"))
+plt.close(fig)
+
+# F8 Kitagawa decomposition (main text): (a) composition + rate = gap; (b) rate part at each group's own mix
+KG = [("FHA vs conventional", f), ("Cash-out vs purchase", c), ("Refinance vs purchase", r), ("LMI vs other tracts", la)]
+fig, axes = plt.subplots(2, 1, figsize=(3.3, 2.55), sharex=True, gridspec_kw={"hspace": 0.5})
+ys = np.arange(len(KG))[::-1]
+ax = axes[0]
+for y, (lab_, k) in zip(ys, KG):
+    ax.barh(y, 100 * k.composition, color="#a6a6a6", height=0.55, label="Composition" if y == ys[0] else None)
+    ax.barh(y, 100 * k.rate, left=100 * k.composition, color=C_CONV, height=0.55, label="Rate (same risk)" if y == ys[0] else None)
+    ax.plot([100 * k.gap] * 2, [y - 0.36, y + 0.36], color="black", lw=1.1)
+    ax.text(max(100 * k.gap, 100 * k.composition) + 0.8, y, f"{100 * k.gap:.1f}", va="center", fontsize=6.5)
+ax.set_yticks(ys); ax.set_yticklabels([k_[0] for k_ in KG], fontsize=7)
+ax.axvline(0, color="#555555", lw=0.6)
+ax.set_title("(a) Gap = composition + rate (averaged weights)", fontsize=7.5, loc="left")
+ax.legend(frameon=False, fontsize=6.5, loc="upper left", handlelength=1.2)
+ax = axes[1]
+for y, (lab_, k) in zip(ys, KG):
+    lo_, hi_ = sorted([100 * k.rate_gap_at_a_mix, 100 * k.rate_gap_at_b_mix])
+    ax.plot([lo_, hi_], [y, y], color="#999999", lw=1.4, zorder=1)
+    ax.scatter(100 * k.rate_gap_at_a_mix, y, marker="^", s=18, color=C_FHA, zorder=2, label="at A's risk mix" if y == ys[0] else None)
+    ax.scatter(100 * k.rate_gap_at_b_mix, y, marker="o", s=14, color=C_CONV, zorder=2, label="at B's risk mix" if y == ys[0] else None)
+ax.set_yticks(ys); ax.set_yticklabels([k_[0] for k_ in KG], fontsize=7)
+ax.axvline(0, color="#555555", lw=0.6)
+ax.set_xlabel("Denial gap, A minus B (percentage points)", fontsize=7.5)
+ax.set_title("(b) Rate part depends on whose risk mix is used", fontsize=7.5, loc="left")
+ax.legend(frameon=False, fontsize=6.5, loc="lower left", handletextpad=0.3)
+for ax in axes:
+    ax.tick_params(axis="x", labelsize=7)
+fig.savefig(os.path.join(FIG, "fig_kitagawa.pdf"))
 plt.close(fig)
 
 # F6 calibration (appendix)

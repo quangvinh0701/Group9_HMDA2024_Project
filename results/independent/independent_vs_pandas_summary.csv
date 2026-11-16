@@ -1,0 +1,23 @@
+quantity,values,agree,max_rel_diff
+sample sizes,11,True,0.0
+applications by loan type,4,True,0.0
+share originated by loan type,4,True,0.0
+share denied by loan type,4,True,9.670941062010586e-16
+share withdrawn by loan type,4,True,4.888850586880789e-16
+loan_originated_by_type: n,4,True,0.0
+loan_originated_by_type: mean,4,True,1.4872952304749606e-16
+loan_originated_by_type: median,4,True,0.0
+rate_spread_by_type: n,4,True,0.0
+rate_spread_by_type: mean,4,True,6.666270936475159e-15
+rate_spread_by_type: median,4,True,0.0
+decisioned by state,55,True,0.0
+denied by state,55,True,0.0
+usable by DTI value,19,True,0.0
+denial rate by DTI value,19,True,9.61073028822372e-16
+oe_state: n,51,True,0.0
+oe_state: O,51,True,0.0
+oe_state: E,51,True,7.6525179703665e-14
+oe_lender: n,767,True,0.0
+oe_lender: O,767,True,0.0
+oe_lender: E,767,True,1.9161266586896e-13
+national O/E,1,True,7.672363911412838e-13

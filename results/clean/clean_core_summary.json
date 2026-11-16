@@ -1,0 +1,10 @@
+{
+ "rows": 5775325,
+ "columns": 43,
+ "partitions": 55,
+ "files": 55,
+ "size_mb": 146.1,
+ "columns_compared_with_pandas": 38,
+ "all_agree": true,
+ "rules_version": "1.1"
+}

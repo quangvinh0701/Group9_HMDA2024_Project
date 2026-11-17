@@ -506,9 +506,7 @@ x = both("eq_5_denial_by_state", None, "denial_rate", lambda t: t.state_code == 
 rows_eq.append(("(5) Denial rate, Florida", *x))
 x = both("eq_6_top50_lenders", None, "oe", lambda t: t["rank"] == "1", d=6)
 rows_eq.append(("(6) $O/E$ of the largest lender", *x))
-for k, label, dd in [("national_oe", "National $O/E$ (usable sample)", 6), ("tau_lender", r"$\tau$ of lender $O/E$", 6),
-                     ("twoway_lender_signal_sd", "Two-way lender effect SD (signal)", 6),
-                     ("hhi_spearman_oe", r"Spearman $\rho$, MSA HHI vs $O/E$", 6)]:
+for k, label, dd in [("tau_lender", r"$\tau$ of lender $O/E$ (SQ4)", 6)]:
     va, vb = kp[k], ks[k]
     rows_eq.append((label, sg(va, dd), sg(vb, dd), abs(va - vb) <= 1e-6 * max(1, abs(va))))
 lines = [f"{q} & {a} & {b} & {'yes' if ok else 'NO'} \\\\" for q, a, b, ok in rows_eq]
@@ -878,9 +876,9 @@ json.dump(MAC, open(os.path.join(OUT, "numbers.json"), "w"), indent=1, ensure_as
 #    (c) interest-rate histogram, (d) loan amount by income band (b-d computed in Pandas and PySpark)
 dhist = rd(os.path.join(DS, "histograms.csv"))
 TYP3 = [("conventional", "Conv.", C_CONV), ("FHA", "FHA", C_FHA), ("VA", "VA", C_VA), ("USDA", "USDA", "#7f6000")]
-fig, (ax, b0, b1, b2) = plt.subplots(1, 4, figsize=(7.1, 2.25), gridspec_kw={"width_ratios": [2.05, 0.9, 1.1, 1.05]})
+fig, (ax, b0, b1, b2) = plt.subplots(1, 4, figsize=(7.1, 2.6), gridspec_kw={"width_ratios": [1.85, 0.95, 1.1, 1.1]})
 purps = [("purchase", "Purchase"), ("refinance", "Refinance"), ("cash_out_refinance", "Cash-out"),
-         ("home_improvement", "Home\nimprov."), ("other", "Other")]
+         ("home_improvement", "Home impr."), ("other", "Other")]
 types = [("conventional", "Conv.", C_CONV), ("FHA", "FHA", C_FHA), ("VA", "VA", C_VA)]
 w = 0.27
 for i, (t, lab_, col) in enumerate(types):
@@ -888,13 +886,13 @@ for i, (t, lab_, col) in enumerate(types):
     xs = np.arange(len(purps)) + (i - 1) * w
     ax.bar(xs, vals, w, color=col, label=lab_)
     for xx, v in zip(xs, vals):
-        ax.text(xx, v + 0.8, f"{v:.0f}", ha="center", va="bottom", fontsize=5.2)
+        ax.text(xx, v + 0.8, f"{v:.0f}", ha="center", va="bottom", fontsize=6.2)
 ax.set_xticks(np.arange(len(purps)))
-ax.set_xticklabels([p[1] for p in purps], fontsize=6.5)
-ax.set_ylabel("Denial rate (%)", fontsize=7.5)
-ax.set_ylim(0, 62)
-ax.legend(frameon=False, ncol=3, loc="upper left", fontsize=6.5)
-ax.set_title("(a) Denial rate by purpose and type", fontsize=8)
+ax.set_xticklabels([p[1] for p in purps], fontsize=7.2, rotation=25, ha="right", rotation_mode="anchor")
+ax.set_ylabel("Denial rate (%)", fontsize=8)
+ax.set_ylim(0, 64)
+ax.legend(frameon=False, ncol=3, loc="upper left", fontsize=7.2, handlelength=1.2, columnspacing=1.0)
+ax.set_title("(a) Denial rate by purpose", fontsize=8.5)
 stats = []
 for t, lab_, col in TYP3:
     q = dsum.loc[("loan_amount", t)]
@@ -904,31 +902,32 @@ bp = b0.bxp(stats, showfliers=False, showmeans=True, widths=0.55, patch_artist=T
             medianprops={"color": "black", "lw": 1})
 for patch, (_, _, col) in zip(bp["boxes"], TYP3):
     patch.set_facecolor(col); patch.set_alpha(0.55)
-b0.set_ylabel("Loan amount (\\$000)", fontsize=7.5)
-b0.set_title("(b) Loan amount", fontsize=8)
-b0.tick_params(axis="x", labelsize=6.2, rotation=30)
+b0.set_ylabel("Loan amount (\\$000)", fontsize=8)
+b0.set_title("(b) Loan amount", fontsize=8.5)
+b0.tick_params(axis="x", labelsize=7.2, rotation=35)
 for t, lab_, col in TYP3[:3]:
     h = dhist[(dhist.variable == "interest_rate") & (dhist.group == t) & (dhist.bin >= 0) & (dhist.bin < 64)]
     h = h.assign(b2=h.bin // 2).groupby("b2")["n"].sum()          # bins of 1/4 point
     x = 2.0 + 0.25 * h.index.to_numpy()
     b1.step(x, 100 * h.to_numpy() / dsum.loc[("interest_rate", t), "n"], where="post", color=col, lw=0.9, label=lab_)
 b1.set_xlim(4.0, 8.75)
-b1.set_xlabel("Interest rate (%)", fontsize=7.5)
-b1.set_ylabel("Share of loans (%)", fontsize=7.5)
-b1.set_title("(c) Interest rate", fontsize=8)
-b1.legend(frameon=False, fontsize=6, loc="upper left")
+b1.set_xlabel("Interest rate (%)", fontsize=8)
+b1.set_ylabel("Share of loans (%)", fontsize=8)
+b1.set_title("(c) Interest rate", fontsize=8.5)
+b1.legend(frameon=False, fontsize=7, loc="upper left", handlelength=1.2)
 for t, lab_, col in TYP3[:3]:
     q = dband[dband.group == t].sort_values("band_idx")
-    b2.plot(q.band_idx, q.median_loan, marker="o", ms=2.2, lw=1, color=col, label=f"{lab_} $\\rho$ = {drho.loc[t, 'spearman']:.2f}")
+    b2.plot(q.band_idx, q.median_loan, marker="o", ms=2.2, lw=1, color=col, label=f"{lab_} {drho.loc[t, 'spearman']:.2f}")
 labs = dband.drop_duplicates("band_idx").sort_values("band_idx").band.tolist()
-b2.set_xticks(np.arange(len(labs))); b2.set_xticklabels(labs, rotation=45, fontsize=5.8)
-b2.set_xlabel("Income (\\$000)", fontsize=7.5, labelpad=1)
-b2.set_ylabel("Median loan (\\$000)", fontsize=7.5)
-b2.set_title("(d) Loan amount by income", fontsize=8)
-b2.legend(frameon=False, fontsize=5.6, loc="upper left", handlelength=1.2)
+b2.set_xticks(np.arange(len(labs))); b2.set_xticklabels(labs, rotation=45, fontsize=6.8)
+b2.set_xlabel("Income (\\$000)", fontsize=8, labelpad=1)
+b2.set_ylabel("Median loan (\\$000)", fontsize=8)
+b2.set_title("(d) Loan by income", fontsize=8.5)
+b2.legend(frameon=False, fontsize=6.6, loc="upper left", handlelength=1.0, borderaxespad=0.2,
+          title="Spearman $\\rho$", title_fontsize=6.6, alignment="left")
 for a_ in (ax, b0, b1, b2):
-    a_.tick_params(axis="y", labelsize=6.5)
-b1.tick_params(axis="x", labelsize=6.5)
+    a_.tick_params(axis="y", labelsize=7.2)
+b1.tick_params(axis="x", labelsize=7.2)
 fig.tight_layout(w_pad=0.6)
 fig.savefig(os.path.join(FIG, "fig_products.pdf"))
 plt.close(fig)

@@ -117,7 +117,7 @@ No state, decisioned (usable) & \nNoStateDec{} (\nNoState) & Reported separately
 
 \textbf{Features.} The file reports DTI as single values for 36--49 and as ranges elsewhere; we map it to a 19-level ordinal and into six bands ($<$30, 30--35, 36--42, 43--49, 50--60, $>$60), without inventing midpoints for the ranges. CLTV gets five bands ($\le$80, 80--90, 90--95, 95--100, $>$100\%), and loan-to-income (loan amount$/(1000\times$income)) is split into tertiles. Crossing the three gives 90 fixed \emph{risk cells}. The smallest holds \minCellN{} usable applications, and every cell has at least \minFHAcell{} FHA applications. An application's expected denial probability is the national denial rate in its risk cell, crossed with loan type and purpose (\nExtCells{} cells; the \fallbackShare\% of applications in cells with fewer than 30 cases use the plain risk-cell rate instead). We compute these rates on the whole usable sample, so they include the applications of the lender or area being judged; the largest lender alone holds \topLenderShare\% of them. This pulls large units toward $O/E=1$, so measured dispersion is, if anything, too low. LMI tracts are those whose income is below 80\% of the area median. Appendix~\ref{app:rules} lists every coding rule.
 
-\textbf{Tests.} A \fd{pytest} suite of \nTests{} tests guards the pipeline. It checks that the rules file is consistent (bands meet without gaps, 19 DTI levels, 90 cells, filters that name real HMDA fields), recomputes headline numbers ($\tau$, the DTI jump, the Kitagawa identity) from the saved tables, plants errors in one engine's output to confirm that the comparison script catches them while tolerating rounding noise, and, in \nTestsSlow{} slower tests, runs Pandas, Spark, and the SQL check of Section~\ref{sec:correct} end to end on a synthetic file with the HMDA schema.
+\textbf{Tests.} A \fd{pytest} suite of \nTests{} tests guards the pipeline. It checks the rules file (bands without gaps, 19 DTI levels, 90 cells, real HMDA field names), recomputes headline numbers from the saved tables, plants errors in one engine's output to confirm that the comparison script catches them, and, in \nTestsSlow{} slower tests, runs Pandas, Spark, and the SQL check end to end on a synthetic file.
 
 \section{Descriptive and Diagnostic Analysis}\label{sec:findings}
 
@@ -220,11 +220,11 @@ The Pandas notebook reads the Parquet file in batches of 200,000 rows with PyArr
 
 \section{PySpark Implementation}
 
-The PySpark notebook runs Spark 4.0.4 in local mode on all four cores, with driver memory set to 60\% of the memory free at start; starting the session takes \sparkInitMain{} s. It reads the same Parquet file and builds the field profile in a single aggregation of 693 conditional counts. Cleaning uses \fd{filter}, \fd{withColumn}, and \fd{when}, and the descriptive and decomposition tables use \fd{groupBy}/\fd{agg}. The Transmittal Sheet and the cell rates are attached with broadcast \fd{join}s. Window functions rank lenders within each agency and split each lender--MSA cell into halves with \fd{row_number}, ordered by a fixed hash and then the row identifier. We find the connected set with label propagation and cut the lineage with \fd{localCheckpoint} after each iteration of the two-way model; without it, the query plan grows with every iteration. Medians use the exact \fd{percentile}, and we compute \fd{percentile_approx} only to measure how far off it is. Logistic regression is refit in MLlib on the same lender folds. The notebook takes \rtSpark{} minutes on the same machine.
+The PySpark notebook runs Spark 4.0.4 in local mode on all four cores, with driver memory set to 60\% of the memory free at start; starting the session takes \sparkInitMain{} s. It reads the same Parquet file and builds the field profile in a single aggregation of 693 conditional counts. Cleaning uses \fd{filter}, \fd{withColumn}, and \fd{when}, and the descriptive and decomposition tables use \fd{groupBy}/\fd{agg}. The Transmittal Sheet and the cell rates are attached with broadcast \fd{join}s. Window functions rank lenders within each agency and split each lender--MSA cell into halves with \fd{row_number}, ordered by a fixed hash and then the row identifier. We find the connected set with label propagation and cut the lineage with \fd{localCheckpoint} after each iteration of the two-way model; without it, the query plan grows with every iteration. Medians use the exact \fd{percentile}. Logistic regression is refit in MLlib on the same lender folds. The notebook takes \rtSpark{} minutes on the same machine.
 
 \section{Correctness Comparison Between Pandas and Spark}\label{sec:correct}
 
-A separate script compares six required outputs, the full field profile, and every key number that both notebooks write. Counts must match exactly, means and rates within a relative tolerance of $10^{-9}$, and the results of the iterative two-way model within $10^{-6}$. Table~\ref{tab:eqsummary} summarizes the comparison; Appendix Table~\ref{tab:eqvalues} shows a few values from both engines side by side.
+A separate script compares six required outputs, the full field profile, and every key number that both notebooks write. Counts must match exactly, means and rates within a relative tolerance of $10^{-9}$, and the results of the iterative two-way model within $10^{-6}$. Table~\ref{tab:eqsummary} summarizes the comparison, and Table~\ref{tab:eqvalues} sets one value from each required output from both engines side by side.
 
 \begin{table}[t]
 \caption{All comparisons. Exact agreement is required for counts; floating-point results within the stated tolerance.}\label{tab:eqsummary}
@@ -239,17 +239,29 @@ Output & Values & Max.\ rel.\ diff. & Agree \\
 \end{tabularx}
 \end{table}
 
+\begin{table}[t]
+\caption{One value from each required output (numbered as in Table~\ref{tab:eqsummary}) and one key number, from each engine. None differs.}\label{tab:eqvalues}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{Lrrc}
+\toprule
+Quantity & Pandas & PySpark & Agree \\
+\midrule
+\tabin{tables/eq_values.tex}
+\bottomrule
+\end{tabularx}
+\end{table}
+
 All \eqTotal{} values agree, as do the \dEqValues{} distribution statistics of Section~\ref{sec:sqone} (largest relative difference $\dEqMax\times10^{\dEqMaxExp}$). The largest difference among the main values, $\eqMaxDiff\times10^{\eqMaxExp}$, is in the national $O/E$ of the five-band DTI sensitivity check, whose denominator adds up expected probabilities over the whole usable sample, and it comes from the order in which floating-point numbers are summed. The two-way results differ by less than $10^{-15}$. Two rank correlations that Spark derives from the Pandas predictions are left out of the \nKeyNumbers{} key numbers, as they are not independent. Spark's \fd{percentile_approx} misses the exact median by up to \approxErr\% (\approxAbs{} points of rate spread), which is why we report exact medians.
 
-\textbf{Differences removed by design.} Three known sources of disagreement were removed in the code, not by adjusting results:
+\textbf{Differences removed by design}, in the code rather than by adjusting results:
 \begin{itemize}[leftmargin=1.1em,itemsep=0pt,topsep=2pt,parsep=0pt]
 \item Pandas drops missing group keys by default while Spark keeps them, so both code them as \fd{NA}.
 \item Every window ordering ends with a unique key (the row or lender identifier), so ties are broken the same way.
 \item Both engines read text from Parquet, so a CSV reader never turns \fd{NA} into a null.
 \end{itemize}
-Before the real run, both notebooks were tested on a synthetic file with the same schema, where the script also reported full agreement.
 
-\textbf{Predictions.} We do not expect predictions from different libraries to match exactly. The MLlib and scikit-learn logistic regressions correlate at \corrMLlib{} out of fold with identical folds, yet \nDiffMLlib{} predictions differ by more than 0.05, up to \maxDiffMLlib. Of these, \nDiffMLlibNA{} are among the \nPurposeNA{} applications whose purpose is ``not applicable''. In this rare category, scikit-learn's weak L2 penalty bounds the coefficient while unpenalized MLlib lets it drift; elsewhere the largest difference is \maxDiffMLlibOther.
+\textbf{Predictions} from different libraries need not match exactly. On identical folds the MLlib and scikit-learn logistic regressions correlate at \corrMLlib; of the \nDiffMLlib{} predictions that differ by more than 0.05, \nDiffMLlibNA{} belong to the \nPurposeNA{} applications with purpose ``not applicable'', where scikit-learn's weak L2 penalty bounds a coefficient that unpenalized MLlib lets drift (elsewhere at most \maxDiffMLlibOther).
 
 \textbf{Beyond agreement between the two engines.} Both notebooks read the same rules file, so a wrong rule would be copied into both and they would still agree. We therefore wrote a third implementation in DuckDB SQL that does not read the rules file: every filter, code mapping, band edge, and the 30-case fallback are written out by hand. It reproduces all \indValues{} values we compared with Pandas (\indQuantities{} groups: sample sizes, outcomes, loan amounts, and spreads by type, the 19 DTI rates, denial by state, and $O$, $E$, and $O/E$ for every state and lender), with a largest relative difference of $\indMaxDiff\times10^{\indMaxExp}$. The Data Browser comparison of Section~2 checks the reading of the raw file against the FFIEC's own aggregates. Table~\ref{tab:verify} sums up the three checks. Together they show that the file is read and the rules are applied as written. Whether a rule is a good choice is a judgment, which we test by varying it (Table~\ref{tab:sens} and Appendix~\ref{app:checks}).
 
@@ -309,7 +321,7 @@ Size & Rows (M) & Pandas & Spark & Faster & Speedup & Pandas & Spark & Faster & 
 
 \textbf{(3) Spark overheads.} Starting a session takes \initMin--\initMax{} s, longer than any Pandas run, warm or cold, up to 2$\times$. Each W3 iteration also launches Spark jobs on small tables, a fixed cost that explains why W3 needs far more data than W1 before Spark catches up.
 
-\textbf{(4) Caching did not pay off at larger sizes.} Building the cache took \cbFull{} s at 100\%, \cbSixteen{} s at 16$\times$, and \cbOom{} s at 32$\times$, and from 4$\times$ upwards the cached runs of all three workloads were slower than the uncached ones (Appendix~\ref{app:supp}, Table~\ref{tab:perfdetail}). A follow-up run rules out memory as the cause (Appendix Table~\ref{tab:cache}): even at 16$\times$ the cached table used \cdMemSixteen{} GB of Spark's \cdStorageMax{} GB of storage memory, every partition stayed cached, and nothing spilled to disk. Caching only the five columns W1 needs did not help either (\cdColsSixteen{} s, against \cdFullSixteen{} s on the full cache and \cdNoCacheSixteen{} s reading Parquet). The extra time therefore lies in scanning Spark's in-memory format, which here was slower than reading the compressed Parquet file (\cdParquetSixteen{} GB at 16$\times$); most likely a file that small stays in the operating system's file cache after the first read, so the uncached run hardly touches the disk either. At 100\% the cache still helped (\cdFullFull{} s against \cdNoCacheFull{} s).
+\textbf{(4) Caching did not pay off at larger sizes.} Building the cache took \cbFull{} s at 100\% and \cbSixteen{} s at 16$\times$, and from 4$\times$ up the cached runs of all three workloads were slower than the uncached ones (Table~\ref{tab:perfdetail}). Memory is not the cause (Table~\ref{tab:cache}): at 16$\times$ the cache used \cdMemSixteen{} of \cdStorageMax{} GB of storage memory, with every partition cached and nothing on disk, and caching only W1's five columns did not help (\cdColsSixteen{} s against \cdNoCacheSixteen{} s from Parquet). The cost lies in scanning Spark's in-memory format; most likely the small Parquet file (\cdParquetSixteen{} GB at 16$\times$) stays in the operating system's file cache, so the uncached run hardly reads the disk either.
 
 \textbf{(5) Memory.} Pandas needs about \pdPerMillion{} GB more for every million rows, from \pdMemFull{} GB at 100\% to \pdMemSixteen{} GB at 16$\times$ (\lastRows{} million rows), where it still completed all three workloads. At 32$\times$ (\oomRows{} million rows) it hit the budget after \oomSecs{} s, while still reading the first copy of the table, so we have no Pandas times for that size. Spark ran every workload there with a peak of \spMemOom{} GB. Reading the full CSV with every field as a Python string went over the budget with both the C and the PyArrow parser. With Arrow-backed types, Pandas read it in \wzArrowTime{} s with a peak of \wzArrowPeak{} GB, against \wzSparkTime{} s and \wzSparkPeak{} GB for Spark, which does not keep the rows. The in-memory representation, not just the row count, decides whether a file fits. At small sizes Spark uses more memory than Pandas (\spMemTen{} versus \pdMemTen{} GB at 10\%), because the JVM reserves its heap up front.
 
@@ -321,7 +333,7 @@ Size & Rows (M) & Pandas & Spark & Faster & Speedup & Pandas & Spark & Faster & 
 
 \textbf{Inputs.} The risk-cell inputs: DTI ordinal, CLTV, loan-to-income, loan amount, income, loan type, and purpose. DTI and CLTV are the values the lender relied on, fixed during underwriting rather than when the application was submitted. We leave out post-decision fields (denial reasons, interest rate, costs, purchaser), race, ethnicity, sex, and age, and the lender and location identifiers that $O/E$ evaluates.
 
-\textbf{Models.} Logistic regression is the transparent baseline. We add histogram gradient boosting because denial does not move in one direction with the inputs (it is higher below 20\% DTI than at 20--30\%, and jumps at 50\%), and the inputs interact, which trees capture without hand-made terms.
+\textbf{Models.} Logistic regression is the transparent baseline. We add histogram gradient boosting because denial does not move in one direction with the inputs (it is higher below 20\% DTI than at 20--30\%, and jumps at 50\%), and the inputs interact, which trees capture without hand-made terms. The proposal planned both models in MLlib; we fit them in scikit-learn and refit only logistic regression in MLlib as a cross-library check (Section~6), since boosted trees from different libraries are not expected to agree.
 
 \textbf{Leakage.} Missing values depend on the outcome (loan term is missing in \missTermDen\% of denials and \missTermApp\% of approvals, DTI in \missDTIDen\% versus \missDTIApp\%), so the model uses only complete cases and imputes nothing.
 
@@ -362,7 +374,7 @@ Gradient boosting ranks applications better than logistic regression (ROC-AUC \a
 
 \section{Conclusion}
 
-Across 4.1 million applications whose risk we can measure, observable risk explains most of the FHA--conventional denial gap on average but not its shape, explains almost none of the cash-out refinance gap, and reveals a sharp underwriting threshold at 50\% DTI rather than 43\%. The lender, not the metropolitan area, is the main source of variation in risk-adjusted denial and pricing. Two implementations built from one rules file reproduce every number we compared, either exactly or within $\eqMaxDiff\times10^{\eqMaxExp}$, and a third written without that file, together with the FFIEC's own aggregates, confirms them. On this machine Pandas stops between \lastRows{} and \oomRows{} million rows of a 15-column table, while loading it. Spark pays off for grouped aggregations from about 3 million rows read from disk or 23 million held in memory, and for anything that no longer fits in memory; on the iterative workload in memory, Pandas stayed faster up to 46 million rows.
+Across 4.1 million applications whose risk we can measure, observable risk explains most of the FHA--conventional denial gap on average but not its shape, explains almost none of the cash-out refinance gap, and reveals a sharp underwriting threshold at 50\% DTI rather than 43\%. The lender, not the metropolitan area, is the main source of variation in risk-adjusted denial and pricing. Pandas and PySpark, built from one rules file, agree on every number we compared, and a SQL version written without that file, together with the FFIEC's own aggregates, confirms them. Pandas hits our memory budget between \lastRows{} and \oomRows{} million rows; Spark pays off for grouped aggregations from about 3 million rows read from disk or 23 million in memory, while Pandas stayed faster on the iterative workload up to 46 million rows.
 
 \begin{table*}[t]
 \caption{Variables and coding rules.}\label{tab:rules}
@@ -451,7 +463,7 @@ Size & Load & W1 & W2 & W3 & Start & Build cache & W1 cached & W1 direct & W2 ca
 \end{table*}
 
 \begin{table*}[t]
-\begin{minipage}[t]{0.53\textwidth}
+\begin{minipage}[t]{0.55\textwidth}
 \caption{DTI jump test: change in denial rate between adjacent DTI values minus the mean step within 36--49 (percentage points). $^{*}$ 95\% confidence interval excludes zero. Bunching: applications at DTI 49 divided by the mean at 44--48.}\label{tab:jump}
 \footnotesize
 \setlength{\tabcolsep}{3.2pt}
@@ -465,15 +477,15 @@ Scope & 49$\to$50--60 & 42$\to$43 & 44$\to$45 & 39$\to$40 & 46$\to$47 & Bunching
 \bottomrule
 \end{tabular}
 \end{minipage}\hfill
-\begin{minipage}[t]{0.44\textwidth}
-\caption{Selected quantities computed independently by Pandas and Spark.}\label{tab:eqvalues}
+\begin{minipage}[t]{0.40\textwidth}
+\caption{Clean core table kept as a notebook output; rows per state and column types are in \texttt{results/clean/}.}\label{tab:clean}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\textwidth}{Lrrc}
+\begin{tabularx}{\textwidth}{Lr}
 \toprule
-Quantity & Pandas & PySpark & Agree \\
+Item & Value \\
 \midrule
-\tabin{tables/eq_values.tex}
+\tabin{tables/clean.tex}
 \bottomrule
 \end{tabularx}
 \end{minipage}
@@ -524,10 +536,9 @@ Quantity & Main & With exempt flags \\
 \end{table*}
 
 \begin{table*}[t]
-\begin{minipage}[t]{0.6\textwidth}
 \caption{Why caching did not pay off: W1 on the performance table, same machine as Table~\ref{tab:perf}. Full: all 15 columns cached; Cols: only the five W1 reads. Storage memory \cdStorageMax{} GB; times are medians of three runs.}\label{tab:cache}
-\scriptsize
-\setlength{\tabcolsep}{2.4pt}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrrrrrrrrrr}
 \toprule
 & & \multicolumn{2}{c}{Build (s)} & \multicolumn{2}{c}{Memory (GB)} & Disk & Parts & \multicolumn{3}{c}{W1 time (s)} \\
@@ -537,19 +548,6 @@ Size & Rows (M) & Full & Cols & Full & Cols & (GB) & cached & Parquet & Full & C
 \tabin{tables/cache.tex}
 \bottomrule
 \end{tabular}
-\end{minipage}\hfill
-\begin{minipage}[t]{0.37\textwidth}
-\caption{Clean core table kept as a notebook output; rows per state and column types are in \texttt{results/clean/}.}\label{tab:clean}
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\textwidth}{Lr}
-\toprule
-Item & Value \\
-\midrule
-\tabin{tables/clean.tex}
-\bottomrule
-\end{tabularx}
-\end{minipage}
 \end{table*}
 
 \bibliographystyle{ACM-Reference-Format}
@@ -567,7 +565,7 @@ Figures~\ref{fig:heatmap}--\ref{fig:calibration} and Tables~\ref{tab:sens}--\ref
 
 \section{Additional Checks}\label{app:checks}
 
-Table~\ref{tab:jump} gives the DTI jump test of Section~\ref{sec:sqtwo}, Table~\ref{tab:dist} the summary statistics behind Figure~\ref{fig:products}b--d, Table~\ref{tab:kitagawa} the values behind Figure~\ref{fig:kitagawa}, Table~\ref{tab:eqvalues} a few quantities from both engines, and Table~\ref{tab:clean} the clean core table of Section~3. Table~\ref{tab:openend} shows the open-end sensitivity run of Section~3, a full rerun of the Pandas notebook with the closed-end filter widened to keep exempt open-end flags. Table~\ref{tab:cache} shows the cache diagnosis of Section~8, a rerun of W1 on the performance table with Spark's storage status read after each cache was built.
+Table~\ref{tab:jump} gives the DTI jump test of Section~\ref{sec:sqtwo}, Table~\ref{tab:dist} the summary statistics behind Figure~\ref{fig:products}b--d, Table~\ref{tab:kitagawa} the values behind Figure~\ref{fig:kitagawa}, and Table~\ref{tab:clean} the clean core table of Section~3. Table~\ref{tab:openend} shows the open-end sensitivity run of Section~3, a full rerun of the Pandas notebook with the closed-end filter widened to keep exempt open-end flags. Table~\ref{tab:cache} shows the cache diagnosis of Section~8, a rerun of W1 on the performance table with Spark's storage status read after each cache was built.
 
 \section{Reproducibility}\label{app:repro}
 

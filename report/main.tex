@@ -263,21 +263,6 @@ All \eqTotal{} values agree, as do the \dEqValues{} distribution statistics of S
 
 \textbf{Beyond agreement between the two engines.} Both notebooks read the same rules file, so a wrong rule would be copied into both and they would still agree. We therefore wrote a third implementation in DuckDB SQL that does not read the rules file: every filter, code mapping, band edge, and the 30-case fallback are written out by hand. It reproduces all \indValues{} values we compared with Pandas (\indQuantities{} groups: sample sizes, outcomes, loan amounts, and spreads by type, the 19 DTI rates, denial by state, and $O$, $E$, and $O/E$ for every state and lender), with a largest relative difference of $\indMaxDiff\times10^{\indMaxExp}$. The Data Browser comparison of Section~2 checks the reading of the raw file against the FFIEC's own aggregates. Appendix Table~\ref{tab:verify} sums up the three checks. Together they show that the file is read and the rules are applied as written. Whether a rule is a good choice is a judgment, which we test by varying it (Table~\ref{tab:sens} and Appendix~\ref{app:checks}).
 
-\section{Performance and Scalability Experiment}
-
-\textbf{Data.} As the instructor advised, we use replicated data only for this benchmark. The input is a 15-column table of the cleaned core sample, so ``100\%'' means its \nCore{} rows, not the whole file; the full file of \nAll{} records is only used in W0. We sample it at 10, 25, and 50\% using a hash of the row identifier, and replicate it 2, 4, and 8 times with shifted identifiers. Pandas still coped at 8$\times$, so we kept doubling until its run was stopped, at 32$\times$. Replication adds rows but not lenders or counties, so grouping may get cheaper relative to genuinely new data of the same size.
-
-\textbf{Workloads.}
-\begin{itemize}[leftmargin=2.2em,itemsep=0pt,topsep=2pt,parsep=0pt]
-\item[(W0)] Reading the original \wzCsvGb{} GB CSV with all 99 fields. Pandas loads it into memory in three ways (the C and PyArrow parsers with every field as a Python string, and the PyArrow parser with Arrow-backed types it infers itself); Spark, with column pruning turned off, splits every row into fields and counts the rows without keeping them.
-\item[(W1)] Denial rate and mean loan amount by loan type $\times$ purpose.
-\item[(W2)] Denial rate for each valid county.
-\item[(W3)] A broadcast join with the Transmittal Sheet, lender $O/E$, ranking within agency, and ten iterations of the two-way model.
-\end{itemize}
-\textbf{Setup.} Each engine and size runs in its own process on the same Kaggle machine (4 CPUs, \ramTotal{} GB RAM, Linux, Python 3.13, Pandas 2.3.3, PyArrow 23.0.1, PySpark 4.0.4 in local mode on all four cores). We sample the memory of the whole process tree, Spark's JVM included, every 0.2 s and stop a run at \budget{} GB, a budget we set at 90\% of RAM; ``stopped'' in the tables means this stop, not a crash.
-
-\textbf{Timing.} Every figure is the median of five runs after one warm-up. Pandas times are given \emph{warm}, with the data already in memory, and \emph{cold}, as the median time to read the 15-column table plus the median warm time. Spark times are given without a cache, reading and computing in one action, and on a cached table, with session start and cache building timed separately for each size. \emph{In memory} (Pandas warm against Spark cached) isolates the computation. \emph{From disk} (Pandas cold against Spark without cache) includes the read, but it is not quite fair, because Pandas reads all 15 columns while Spark reads only the four or five a query needs. Each Pandas workload selects just the columns it uses before grouping, as Spark's optimizer does. Repeated Pandas runs vary by about \spreadPandas\% of the median and uncached Spark runs by \spreadSparkLo--\spreadSparkHi\%, so small differences should be read as ties. At 100\% the two engines give the same W1 and W2 results, and W3 results that agree within $\perfEqThree$.
-
 \begin{table*}[t]
 \caption{Median time (s) of five runs, excluding Spark session start (\initMin--\initMax{} s) and cache building; definitions of \emph{in memory} and \emph{from disk} in the text. Speedup $=T_\text{Pandas}/T_\text{Spark}$. Peak memory is per process over all workloads. Stopped: Pandas reached the \budget{} GB budget while loading the table.}\label{tab:perf}
 \footnotesize
@@ -293,6 +278,21 @@ Size & Rows (M) & Pandas & Spark & Faster & Speedup & Pandas & Spark & Faster & 
 \multicolumn{12}{l}{$^{a}$ Reached while loading the table, where the process was stopped at the budget.}
 \end{tabular}
 \end{table*}
+
+\section{Performance and Scalability Experiment}
+
+\textbf{Data.} As the instructor advised, we use replicated data only for this benchmark. The input is a 15-column table of the cleaned core sample, so ``100\%'' means its \nCore{} rows, not the whole file; the full file of \nAll{} records is only used in W0. We sample it at 10, 25, and 50\% using a hash of the row identifier, and replicate it 2, 4, and 8 times with shifted identifiers. Pandas still coped at 8$\times$, so we kept doubling until its run was stopped, at 32$\times$. Replication adds rows but not lenders or counties, so grouping may get cheaper relative to genuinely new data of the same size.
+
+\textbf{Workloads.}
+\begin{itemize}[leftmargin=2.2em,itemsep=0pt,topsep=2pt,parsep=0pt]
+\item[(W0)] Reading the original \wzCsvGb{} GB CSV with all 99 fields. Pandas loads it into memory in three ways (the C and PyArrow parsers with every field as a Python string, and the PyArrow parser with Arrow-backed types it infers itself); Spark, with column pruning turned off, splits every row into fields and counts the rows without keeping them.
+\item[(W1)] Denial rate and mean loan amount by loan type $\times$ purpose.
+\item[(W2)] Denial rate for each valid county.
+\item[(W3)] A broadcast join with the Transmittal Sheet, lender $O/E$, ranking within agency, and ten iterations of the two-way model.
+\end{itemize}
+\textbf{Setup.} Each engine and size runs in its own process on the same Kaggle machine (4 CPUs, \ramTotal{} GB RAM, Linux, Python 3.13, Pandas 2.3.3, PyArrow 23.0.1, PySpark 4.0.4 in local mode on all four cores). We sample the memory of the whole process tree, Spark's JVM included, every 0.2 s and stop a run at \budget{} GB, a budget we set at 90\% of RAM; ``stopped'' in the tables means this stop, not a crash.
+
+\textbf{Timing.} Every figure is the median of five runs after one warm-up. Pandas times are given \emph{warm}, with the data already in memory, and \emph{cold}, as the median time to read the 15-column table plus the median warm time. Spark times are given without a cache, reading and computing in one action, and on a cached table, with session start and cache building timed separately for each size. \emph{In memory} (Pandas warm against Spark cached) isolates the computation. \emph{From disk} (Pandas cold against Spark without cache) includes the read, but it is not quite fair, because Pandas reads all 15 columns while Spark reads only the four or five a query needs. Each Pandas workload selects just the columns it uses before grouping, as Spark's optimizer does. Repeated Pandas runs vary by about \spreadPandas\% of the median and uncached Spark runs by \spreadSparkLo--\spreadSparkHi\%, so small differences should be read as ties. At 100\% the two engines give the same W1 and W2 results, and W3 results that agree within $\perfEqThree$.
 
 \textbf{(1) Which is faster?} It depends on size, workload, and what we count (Table~\ref{tab:perf}; plotted in Appendix Figure~\ref{fig:perf}). \emph{In memory}, Pandas is faster on the grouped aggregation W1 up to 2$\times$ (11.6 million rows), the two tie at 100\% (\memWOneFullPd{} versus \memWOneFullSp{} s), and Spark wins from 4$\times$, by \memWOneSixteen{} times at 16$\times$. On the iterative W3, Pandas is faster up to 8$\times$ (46.2 million rows), by \memWThreeEightInv{} times there, and the two tie at 16$\times$ (\memWThreeSixPd{} versus \memWThreeSixSp{} s). \emph{From disk}, Spark wins W1 from 50\% (2.9 million rows) and is \spWOneSixteen{} times faster at 16$\times$. But reading the table is \loadShareSixteen\% of the Pandas time there, so this overstates Spark's computing advantage. On W3, Pandas is faster up to 2$\times$ and Spark from 4$\times$, by \spWThreeSixteen{} times at 16$\times$.
 

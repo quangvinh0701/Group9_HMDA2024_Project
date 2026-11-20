@@ -67,7 +67,7 @@ plt.rcParams.update({
     "axes.labelsize": 9, "xtick.labelsize": 8, "ytick.labelsize": 8, "legend.fontsize": 8,
     "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True,
     "grid.color": "#dddddd", "grid.linewidth": 0.5, "axes.axisbelow": True,
-    "figure.dpi": 150, "savefig.bbox": "tight", "mathtext.fontset": "cm",
+    "figure.dpi": 150, "savefig.bbox": "tight", "savefig.pad_inches": 0.03, "mathtext.fontset": "cm",
 })
 if STYLE == "acm":
     plt.rcParams.update({"mathtext.fontset": "custom", "mathtext.rm": FONT, "mathtext.it": FONT + ":italic",

@@ -29,6 +29,15 @@
 \makeatletter\newcommand{\tabin}[1]{\@@input #1 }\makeatother
 % allow slightly looser lines instead of lines running into the margin of the narrow columns
 \setlength{\emergencystretch}{1.5em}
+% tighter spacing around floats and captions (the class defaults stretch up to 23pt)
+\setlength{\textfloatsep}{10pt plus 3pt minus 2pt}
+\setlength{\dbltextfloatsep}{10pt plus 3pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\dblfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+\AtBeginDocument{\captionsetup{skip=5pt}}
+% let a column end one line short of a widow or orphan rather than stretching the gaps around floats and headings
+\AtBeginDocument{\clubpenalty=300 \widowpenalty=300 \brokenpenalty=200 \setlength{\parskip}{0pt plus 1pt}}
 
 \setcounter{dbltopnumber}{2}
 \setcounter{topnumber}{3}
@@ -180,7 +189,7 @@ The limit that binds conventional loans in 2024 is thus 50\%, the cap in the GSE
 \caption{Denial rate by debt-to-income ratio, usable decisioned applications. (a) All 19 reported values; (b) single values 36--49 and the 50--60 bin by loan type (log scale). Dashed line: the cut between 49 and 50--60; dotted line in (b): the 43\% cut.}\label{fig:dti}
 \end{figure*}
 
-\textbf{Low DTI is not low risk.} Applications with DTI below 20\% are denied at \drDTIlowTwenty\%, more than the \drDTItwentyThirty\% at 20--30\%, and mostly over credit history: low DTI marks a different group of applicants rather than a safer one, and CLTV shows the same U shape (Appendix~\ref{app:lowdti}).
+\textbf{Low DTI is not low risk.} Applications with DTI below 20\% are denied at \drDTIlowTwenty\%, more than the \drDTItwentyThirty\% at 20--30\%. These applicants earn more (median income \$\lowDTIincome{}k against \$\midDTIincome{}k), have lower CLTV (median \lowDTIcltv\%), and more often refinance (\lowDTInonPurchase\% of their applications are not purchases, against \midDTInonPurchase\%), yet credit history is cited in \lowDTIcredit\% of their denials, against \midDTIcredit\% at 20--30\%. Low DTI therefore marks a different group of applicants rather than a safer one. CLTV shows the same U shape: denial is \drCLTVlow\% at CLTV $\le$80\%, where cash-out refinancing is concentrated (\convCashoutLeEighty\% of conventional cash-out originations), \drCLTVmid\% at 90--95\%, and \drCLTVhigh\% above 100\%.
 
 \textbf{Decomposition.} Figure~\ref{fig:kitagawa} uses a Kitagawa decomposition \citep{kitagawa1955} over the 90 risk cells to split each gap into a composition part (the groups have different risk mixes) and a rate part (they are denied at different rates at the same risk), using the average of the two groups' weights. We also show the rate part at each group's own mix, since the explained share depends on that choice. These gaps are measured on the usable sample, so they differ from those in Section~\ref{sec:sqone}, which use all decisioned applications (\gapFHAdecisioned{} points for FHA versus conventional and \gapCOdecisioned{} for cash-out versus purchase).
 
@@ -192,17 +201,17 @@ The limit that binds conventional loans in 2024 is thus 50\%, the cap in the GSE
 
 \emph{FHA versus conventional (H1).} With averaged weights, \kgFHAcompShare\% of the \kgFHAgap{}-point gap is composition. On its own, that share means little. The rate gap is \kgFHAatFHA{} points at the FHA mix but \kgFHAatConv{} at the conventional mix, and the gaps inside single cells range from \kgFHAmin{} to \kgFHAmax{} points (FHA is denied more in \kgFHAhigher{} cells and less in \kgFHAlower). FHA approves more often in the high-DTI, high-CLTV cells it was designed for, and denies more often where conventional borrowers are concentrated. This fits applicants in those cells choosing FHA because of weaker credit, which HMDA does not record. Two caveats apply. The cells do not account for loan purpose, and cash-out refinancing makes up \coShareFHA\% of FHA decisions but only \coShareConv\% of conventional ones, so part of the rate component may reflect purpose. The most extreme cell gaps also come from small cells (the smallest holds \minFHAcell{} FHA applications). \emph{Cash-out versus purchase.} Here the \kgCOgap{}-point gap is almost all rate (\kgCOrate{} points), and cash-out applications are denied more in \kgCOhigher{} of the 90 cells. Credit history is cited in \creditCashout\% of cash-out denials but only \creditPurchase\% of purchase denials, where DTI is the most common reason (\dtiReasonPurchase\%). Lenders seem to see pulling equity out of a home as riskier, even when the measured ratios are the same.
 
-\textbf{Pricing.} Among conventional loans, cash-out loans pay \psCOconvGap{} points more in spread than purchases, all of it within risk cells (rate part \psCOconvRate); for VA loans the within-cell gap is larger, and FHA cash-out loans share too few cells with purchases to decompose (Appendix~\ref{app:pricing}).
+\textbf{Pricing.} Among conventional loans, cash-out loans pay \psCOconvGap{} points more in spread than purchases, and all of it is within risk cells (rate part \psCOconvRate{}; purchase coverage \psCOconvCov\%). Dropping spreads above 5 points leaves the gap at \psCOconvGapFive. For VA loans the within-cell gap is larger (\psCOvaRate{} points), and composition partly offsets it (\psCOvaComp). Only \fhaCashoutGtEighty\% of FHA cash-out loans have CLTV above 80\%, so they share cells with just \psCOfhaCov\% of FHA purchases, too few for us to interpret that decomposition.
 
 \subsection{Geography (SQ3)}
 
-Adjusting for risk changes less across states than across products. The standard deviation of state denial rates falls from \sdStateRaw{} to \sdStateStd{} points after standardization, and the between-state variance of $O/E$, net of binomial noise, gives $\tau=\tauState$ across \nStates{} jurisdictions (the 50 states and DC). Ratios range from \stMinOE{} in \stMinName{} to \stMaxOE{} in \stMaxName{} (Figure~\ref{fig:funnel}a); the highest cluster in the Gulf and Southeast states and the lowest in the northern Plains, the upper Midwest, and the Northwest. Among the \nMSA{} MSAs with at least 1,000 usable applications, $\tau=\tauMSA$, and \msaOutside\% fall outside the 95\% funnel limits \citep[Figure~\ref{fig:funnel}c;][]{spiegelhalter2005}. LMI tracts (H4) are denied at \drLMI\%, against \drNonLMI\% elsewhere. Of the \kgLMIgap{}-point gap, \kgLMIrate{} points remain within risk cells (LMI tracts are denied more in \kgLMIhigher{} of 90 cells), and a within-cell gap of \lmiTypeMin{} to \lmiTypeMax{} points remains inside conventional, FHA, and VA loans taken separately. Loans originated in LMI tracts are also smaller (median \$\loanLMI{} versus \$\loanNonLMI). Puerto Rico and applications without a state are reported separately (Appendix~\ref{app:geo}).
+Adjusting for risk changes less across states than across products. The standard deviation of state denial rates falls from \sdStateRaw{} to \sdStateStd{} points after standardization, and the between-state variance of $O/E$, net of binomial noise, gives $\tau=\tauState$ across \nStates{} jurisdictions (the 50 states and DC). Ratios range from \stMinOE{} in \stMinName{} to \stMaxOE{} in \stMaxName{} (Figure~\ref{fig:funnel}a); the highest cluster in the Gulf and Southeast states and the lowest in the northern Plains, the upper Midwest, and the Northwest. Among the \nMSA{} MSAs with at least 1,000 usable applications, $\tau=\tauMSA$, and \msaOutside\% fall outside the 95\% funnel limits \citep[Figure~\ref{fig:funnel}c;][]{spiegelhalter2005}. LMI tracts (H4) are denied at \drLMI\%, against \drNonLMI\% elsewhere. Of the \kgLMIgap{}-point gap, \kgLMIrate{} points remain within risk cells (LMI tracts are denied more in \kgLMIhigher{} of 90 cells), and a within-cell gap of \lmiTypeMin{} to \lmiTypeMax{} points remains inside conventional, FHA, and VA loans taken separately. Loans originated in LMI tracts are also smaller (median \$\loanLMI{} versus \$\loanNonLMI). Puerto Rico ($O/E=\oePR$) and the \nNoState{} usable applications without a state ($O/E=\oeNoState$) are kept out of the state comparison; of the \nNoStateDec{} decisioned ones, \noStateNoTract{} also lack a tract, so they are records missing a location rather than a region.
 
 About a third of the spread in raw state denial rates disappears once applicants are compared at equal measured risk, so ranking places by their raw denial rates says little about lending standards. The remaining LMI gap is not proof of different treatment either. Credit scores, which HMDA leaves out, may differ between LMI and other tracts, and our risk cells only use three ratios.
 
 \subsection{Lenders (SQ4)}\label{sec:sqfour}
 
-The \nLenderEightTwelve{} lenders with at least 500 decisioned applications account for \lenderShare\% of all decisions, and \nLender{} of them also have at least 80\% usable applications. Their $O/E$ ratios are much more spread out than those of MSAs (H3; Figure~\ref{fig:funnel}b,~c): $\tau=\tauLender$ against \tauMSA, and \lenderOutside\% of lenders fall outside the 95\% limits (\lenderOutsideHigh\% outside 99.8\%). The distribution is skewed. The median lender has $O/E=\lenderMedianOE$, there is a long upper tail above 2, and \nZeroDen{} lenders denied nobody at all. Most lenders sit below 1 because the expected rate is driven by large lenders; this inflates the share outside the funnel but not $\tau$ (Appendix~\ref{app:lenders}).
+The \nLenderEightTwelve{} lenders with at least 500 decisioned applications account for \lenderShare\% of all decisions, and \nLender{} of them also have at least 80\% usable applications. Their $O/E$ ratios are much more spread out than those of MSAs (H3; Figure~\ref{fig:funnel}b,~c): $\tau=\tauLender$ against \tauMSA, and \lenderOutside\% of lenders fall outside the 95\% limits (\lenderOutsideHigh\% outside 99.8\%). The distribution is skewed. The median lender has $O/E=\lenderMedianOE$, there is a long upper tail above 2, and \nZeroDen{} lenders denied nobody at all. Most lenders sit below 1 because the expected rate is weighted by applications and so driven by large lenders; this inflates the share outside a funnel centred on 1 but not $\tau$, which measures spread around the mean. Weighted by applications, $\tau$ is \tauLenderW{} for lenders and \tauMSAW{} for MSAs. Median $O/E$ is \agHUD{} for the \nHUD{} lenders supervised through HUD (independent mortgage companies) and \agCFPB{} for the large banks supervised by the CFPB.
 
 \begin{figure*}[t]
 \centering
@@ -210,7 +219,7 @@ The \nLenderEightTwelve{} lenders with at least 500 decisioned applications acco
 \caption{Observed to expected denials. (a) States and DC, risk-standardized ratio $O/E$ on a tile map (each square one jurisdiction). (b, c) Funnel plots for lenders and MSAs; limits use the median ratio of binomial variance to $E$. One lender with $O/E>3.2$ is not drawn.}\label{fig:funnel}
 \end{figure*}
 
-Since an MSA's ratio pools many lenders, we also fit additive lender and MSA effects on residual denial (denied minus expected). This is an AKM-type design \citep{akm1999}, estimated on the connected set of \twLenders{} lenders, \twMSA{} MSAs, and \twRecords{} applications; the median lender is active in \twMedianMSA{} MSAs. To get the signal variance, we estimate the effects on two random halves of each lender--MSA cell and take their covariance, which removes noise and limited-mobility bias \citep{andrews2008}. The signal standard deviation of lender effects is \twLenderSD{} points, against \twMSASD{} for MSAs, a ratio of \twRatio{} (about \twVarRatio{} in variance). The result holds within conventional and FHA loans and across alternative thresholds ($\tau$ between \tauSensMin{} and \tauSensMax; Table~\ref{tab:sens}). Pricing tells the same story: the spread $\tau$ is \spreadTauLender{} points across lenders, against \spreadTauMSA{} across MSAs.
+Since an MSA's ratio pools many lenders, we also fit additive lender and MSA effects on residual denial (denied minus expected). This is an AKM-type design \citep{akm1999}, estimated on the connected set of \twLenders{} lenders, \twMSA{} MSAs, and \twRecords{} applications; the median lender is active in \twMedianMSA{} MSAs. To get the signal variance, we estimate the effects on two random halves of each lender--MSA cell and take their covariance, which removes noise and limited-mobility bias \citep{andrews2008} (Appendix~\ref{app:lenders}). The signal standard deviation of lender effects is \twLenderSD{} points, against \twMSASD{} for MSAs, a ratio of \twRatio{} (about \twVarRatio{} in variance). The ratio result is also robust: $\tau$ is \tauLenderConv{} within conventional loans and \tauLenderFHA{} within FHA (rank correlations with the main ratio of \rhoConv{} and \rhoFHA), it stays between \tauSensMin{} and \tauSensMax{} under other cell, lender-size, and usable-share thresholds (Table~\ref{tab:sens}), and rankings by raw denial barely move when withdrawn and incomplete applications enter the denominator ($\rho=\rhoDef$). Pricing tells the same story: the spread $\tau$ is \spreadTauLender{} points across \nSpreadLender{} lenders, against \spreadTauMSA{} across MSAs. How concentrated lending is in an MSA (median HHI \hhiMedian, 10th--90th percentile \hhiPten--\hhiPninety) has only a weak link with its denial ratio ($\rho=\rhoHHI$).
 
 For a borrower, this means risk-adjusted denial varies about four times as much between lenders as between metropolitan areas, measured in standard deviations. For a supervisor, lender outliers, not regional ones, are where review pays off. Still, lenders attract applicants with different credit profiles, and they differ in how many weak applications they discourage before a formal decision, so the lender variance is an upper bound on real differences in credit policy.
 
@@ -220,7 +229,7 @@ The Pandas notebook reads the Parquet file in batches of 200,000 rows with PyArr
 
 \section{PySpark Implementation}
 
-The PySpark notebook runs Spark 4.0.4 in local mode on all four cores, with driver memory set to 60\% of the memory free at start; starting the session takes \sparkInitMain{} s. It reads the same Parquet file and builds the field profile in a single aggregation of 693 conditional counts. Cleaning uses \fd{filter}, \fd{withColumn}, and \fd{when}, and the descriptive and decomposition tables use \fd{groupBy}/\fd{agg}. The Transmittal Sheet and the cell rates are attached with broadcast \fd{join}s. Window functions rank lenders within each agency and split each lender--MSA cell into halves with \fd{row_number}, ordered by a fixed hash and then the row identifier. We find the connected set with label propagation and cut the lineage with \fd{localCheckpoint} after each iteration of the two-way model; without it, the query plan grows with every iteration. Medians use the exact \fd{percentile}. Logistic regression is refit in MLlib on the same lender folds (Appendix~\ref{app:checks} compares the two fits). The notebook takes \rtSpark{} minutes on the same machine.
+The PySpark notebook runs Spark 4.0.4 in local mode on all four cores, with driver memory set to 60\% of the memory free at start; starting the session takes \sparkInitMain{} s. It reads the same Parquet file and builds the field profile in a single aggregation of 693 conditional counts. Cleaning uses \fd{filter}, \fd{withColumn}, and \fd{when}, and the descriptive and decomposition tables use \fd{groupBy}/\fd{agg}. The Transmittal Sheet and the cell rates are attached with broadcast \fd{join}s. Window functions rank lenders within each agency and split each lender--MSA cell into halves with \fd{row_number}, ordered by a fixed hash and then the row identifier. We find the connected set with label propagation and cut the lineage with \fd{localCheckpoint} after each iteration of the two-way model; without it, the query plan grows with every iteration. Medians use the exact \fd{percentile}. Logistic regression is refit in MLlib on the same lender folds (Section~\ref{sec:pred} compares the two fits). The notebook takes \rtSpark{} minutes on the same machine.
 
 \section{Correctness Comparison Between Pandas and Spark}\label{sec:correct}
 
@@ -306,13 +315,13 @@ Size & Rows (M) & Pandas & Spark & Faster & Speedup & Pandas & Spark & Faster & 
 
 \textbf{(6) When is Spark the better choice?} When a table gets close to the memory limit, and, on these four cores, for grouped aggregations from about 3 million rows when the data come from disk, or about 23 million rows when they are already in memory. For iterative work on data that fit in memory, Pandas was faster up to 46 million rows and tied at \lastRows{} million; there Spark's edge is that it keeps going past the memory limit. Pandas can only hold the raw CSV with Arrow-backed types, and then needs \wzMemRatio{} times Spark's peak memory. For interactive work on the 4.1-million-row usable sample, Pandas is simpler and quite fast enough.
 
-\section{Optional Predictive Analysis}
+\section{Optional Predictive Analysis}\label{sec:pred}
 
 \textbf{Target and use.} We predict denial among usable decisioned applications (base rate \baseRate\%). Its only use is as an alternative expected value in $O/E$, to test whether lender rankings depend on the coarse risk cells.
 
 \textbf{Inputs.} The risk-cell inputs: DTI ordinal, CLTV, loan-to-income, loan amount, income, loan type, and purpose. DTI and CLTV are the values the lender relied on, fixed during underwriting rather than when the application was submitted. We leave out post-decision fields (denial reasons, interest rate, costs, purchaser), race, ethnicity, sex, and age, and the lender and location identifiers that $O/E$ evaluates.
 
-\textbf{Models.} Logistic regression is the transparent baseline. We add histogram gradient boosting because denial does not move in one direction with the inputs (it is higher below 20\% DTI than at 20--30\%, and jumps at 50\%), and the inputs interact, which trees capture without hand-made terms. The proposal planned both models in MLlib; we fit them in scikit-learn and refit only logistic regression in MLlib as a cross-library check (Section~6), since boosted trees from different libraries are not expected to agree.
+\textbf{Models.} Logistic regression is the transparent baseline. We add histogram gradient boosting because denial does not move in one direction with the inputs (it is higher below 20\% DTI than at 20--30\%, and jumps at 50\%), and the inputs interact, which trees capture without hand-made terms. The proposal planned both models in MLlib; we fit them in scikit-learn and refit only logistic regression in MLlib as a cross-library check (Section~6), since boosted trees from different libraries are not expected to agree. On identical folds the two logistic regressions correlate at \corrMLlib; of the \nDiffMLlib{} predictions that differ by more than 0.05, \nDiffMLlibNA{} belong to the \nPurposeNA{} applications with purpose ``not applicable'', where scikit-learn's weak L2 penalty bounds a coefficient that unpenalized MLlib lets drift (elsewhere the difference is at most \maxDiffMLlibOther). Two rank correlations that Spark derives from the Pandas predictions are left out of the \nKeyNumbers{} key numbers of Table~\ref{tab:eqsummary}, as they are not independent.
 
 \textbf{Leakage.} Missing values depend on the outcome (loan term is missing in \missTermDen\% of denials and \missTermApp\% of approvals, DTI in \missDTIDen\% versus \missDTIApp\%), so the model uses only complete cases and imputes nothing.
 
@@ -331,7 +340,7 @@ Model & ROC-AUC & PR-AUC & Brier & CITL & Slope \\
 \end{tabular}
 \end{table}
 
-Gradient boosting ranks applications better than logistic regression (ROC-AUC \aucGB{} versus \aucLR), and both are well calibrated on average, with slopes close to 1 (Appendix~\ref{app:supp}, Figure~\ref{fig:calibration}). Using either model instead of the cell-based expectation leaves lender rankings almost unchanged (Spearman $\rho=\rhoPredLR$ and \rhoPredGB), so the lender dispersion in SQ4 does not come from coarse cells. Calibration also holds within loan types, purposes, and DTI bands, but both models underpredict denial in LMI tracts, where location is left out (Appendix~\ref{app:predsub}). \emph{Limitations.} Without credit scores the model captures only part of the risk, and income and loan size are correlated with protected characteristics, so the model is not fit for decisions about individual applicants.
+Gradient boosting ranks applications better than logistic regression (ROC-AUC \aucGB{} versus \aucLR), and both are well calibrated on average, with slopes close to 1 (Appendix~\ref{app:supp}, Figure~\ref{fig:calibration}). Using either model instead of the cell-based expectation leaves lender rankings almost unchanged (Spearman $\rho=\rhoPredLR$ and \rhoPredGB), so the lender dispersion in SQ4 does not come from coarse cells. The logistic model underpredicts in its lowest decile (\calLRlowPred\% predicted, \calLRlowObs\% observed). Within loan types, purposes, and DTI bands the mean prediction stays within \predMaxCITL{} points of the observed rate, but both models underpredict denial in LMI tracts (gradient boosting \predLMIgb\%, logistic \predLMIlr\%, observed \predLMIobs\%), because location is deliberately left out; this is the within-cell LMI gap of SQ3 seen from the model side. For the \predUnkN{} applications without a tract the shortfall is larger (\predUnkGB\% against \predUnkObs\%). \emph{Limitations.} Without credit scores the model captures only part of the risk, and income and loan size are correlated with protected characteristics, so the model is not fit for decisions about individual applicants.
 
 \section{Financial Interpretation and Limitations}
 
@@ -362,7 +371,7 @@ Across 4.1 million applications whose risk we can measure, observable risk expla
 \renewcommand{\textfraction}{0.07}
 \renewcommand{\dblfloatpagefraction}{0.3}
 \renewcommand{\floatpagefraction}{0.3}
-\makeatletter\setlength{\@dblfptop}{0pt}\setlength{\@dblfpsep}{16pt plus 4pt}\setlength{\@dblfpbot}{0pt plus 1fil}\makeatother
+\makeatletter\setlength{\@dblfptop}{0pt}\setlength{\@dblfpsep}{10pt plus 6pt}\setlength{\@dblfpbot}{0pt plus 1fil}\makeatother
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}
@@ -377,17 +386,53 @@ Table~\ref{tab:rules} lists the fields used for each sub-question and every codi
 
 Figures~\ref{fig:heatmap}--\ref{fig:perf} and Tables~\ref{tab:sens}--\ref{tab:perfdetail} back the main text; the paragraphs below give the details summarized there.
 
-\textbf{Low DTI and CLTV (Section~\ref{sec:sqtwo}).}\label{app:lowdti} Applications with DTI below 20\% are denied at \drDTIlowTwenty\%, more than the \drDTItwentyThirty\% at 20--30\%. These applicants earn more (median income \$\lowDTIincome{}k against \$\midDTIincome{}k) and have lower CLTV, but credit history is cited in \lowDTIcredit\% of their denials, against \midDTIcredit\% at 20--30\%. Low DTI therefore points to a different group of applicants rather than a safer one: \lowDTInonPurchase\% of their applications are not purchases (against \midDTInonPurchase\%), and their median CLTV is \lowDTIcltv\%. CLTV shows the same U shape. Denial is \drCLTVlow\% at CLTV $\le$80\%, where cash-out refinancing is concentrated (\convCashoutLeEighty\% of conventional cash-out originations), \drCLTVmid\% at 90--95\%, and \drCLTVhigh\% above 100\%.
+\textbf{Two-way model (Section~\ref{sec:sqfour}).}\label{app:lenders} The split-sample correction makes little difference here (lender effects have a standard deviation of \twLenderFullSD{} points before it), since only \twLeTwoShare\% of lenders work in two or fewer MSAs. We ran 40 alternating iterations, and the last one moved no effect by more than $\twLastChange$.
 
-\textbf{Pricing (Section~\ref{sec:sqtwo}).}\label{app:pricing} Among conventional loans, cash-out loans pay \psCOconvGap{} points more in spread than purchases, and all of it is within cells (rate part \psCOconvRate{}; purchase coverage \psCOconvCov\%). Dropping spreads above 5 points leaves the gap at \psCOconvGapFive. For VA loans the within-cell gap is larger (\psCOvaRate{} points), and composition partly offsets it (\psCOvaComp). Only \fhaCashoutGtEighty\% of FHA cash-out loans have CLTV above 80\%, so they share cells with just \psCOfhaCov\% of FHA purchases, too few for us to interpret that decomposition.
 
-\textbf{Places without a region (Section~4.3).}\label{app:geo} We report Puerto Rico ($O/E=\oePR$) and the \nNoState{} usable applications with no state ($O/E=\oeNoState$) separately. Of the \nNoStateDec{} decisioned ones, \noStateNoTract{} also lack a tract, so they are records missing a location, not a region.
 
-\textbf{Lenders (Section~\ref{sec:sqfour}).}\label{app:lenders} The expected rate is weighted by applications and so driven by large lenders; most lenders sit below 1, which inflates the share outside a funnel centred on 1, but not $\tau$, which measures spread around the mean. Weighted by applications, $\tau$ is \tauLenderW{} for lenders and \tauMSAW{} for MSAs. Median $O/E$ is \agHUD{} for the \nHUD{} lenders supervised through HUD (independent mortgage companies) and \agCFPB{} for the large banks supervised by the CFPB. The correction makes little difference here (\twLenderFullSD{} points before it), since only \twLeTwoShare\% of lenders work in two or fewer MSAs. We ran 40 alternating iterations, and the last one moved no effect by more than $\twLastChange$. The result is robust: $\tau$ is \tauLenderConv{} within conventional loans and \tauLenderFHA{} within FHA (rank correlations with the main ratio of \rhoConv{} and \rhoFHA), and it stays between \tauSensMin{} and \tauSensMax{} when we change the cell, lender-size, and usable-share thresholds. Rankings by raw denial barely move when withdrawn and incomplete applications are added to the denominator ($\rho=\rhoDef$). Pricing tells the same story: the spread $\tau$ is \spreadTauLender{} points across \nSpreadLender{} lenders, against \spreadTauMSA{} across MSAs. How concentrated lending is in an MSA (median HHI \hhiMedian, 10th--90th percentile \hhiPten--\hhiPninety) has only a weak link with its denial ratio ($\rho=\rhoHHI$).
 
-\textbf{Prediction by subgroup (Section~9).}\label{app:predsub} The logistic model underpredicts in its lowest decile (\calLRlowPred\% predicted, \calLRlowObs\% observed). Within subgroups, the mean prediction stays within \predMaxCITL{} points of the observed rate for every loan type, purpose, and DTI band, but both models underpredict denial in LMI tracts (gradient boosting \predLMIgb\%, logistic \predLMIlr\%, observed \predLMIobs\%), because location is deliberately left out; this is the within-cell LMI gap of SQ3 seen from the model side. For the \predUnkN{} applications without a tract the shortfall is larger (\predUnkGB\% against \predUnkObs\%).
 
-\begin{table*}[t]
+\section{Additional Checks}\label{app:checks}
+
+Table~\ref{tab:clean} describes the clean core table of Section~3, and Table~\ref{tab:openend} shows the open-end sensitivity run of Section~3, a full rerun of the Pandas notebook with the closed-end filter widened to keep exempt open-end flags. Table~\ref{tab:jump} gives the DTI jump test of Section~\ref{sec:sqtwo}, Table~\ref{tab:kitagawa} the values behind Figure~\ref{fig:kitagawa}, and Table~\ref{tab:dist} the summary statistics behind Figure~\ref{fig:products}b--d. Table~\ref{tab:cache} shows the cache diagnosis of Section~8, a rerun of W1 on the performance table with Spark's storage status read after each cache was built.
+
+\begin{table}[b]
+\caption{Clean core table kept as a notebook output; rows per state and column types are in \texttt{results/clean/}.}\label{tab:clean}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{Lr}
+\toprule
+Item & Value \\
+\midrule
+\tabin{tables/clean.tex}
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[b]
+\caption{Sensitivity to records whose open-end flag is exempt (gaps and jumps in percentage points).}\label{tab:openend}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{Lrr}
+\toprule
+Quantity & Main & With exempt flags \\
+\midrule
+\tabin{tables/open_end.tex}
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Cache diagnosis (Section~8).} Building the cache took \cbFull{} s at 100\% and \cbSixteen{} s at 16$\times$, and from 4$\times$ up the cached runs of all three workloads were slower than the uncached ones (Table~\ref{tab:perfdetail}). Memory is not the cause (Table~\ref{tab:cache}): at 16$\times$ the cache used \cdMemSixteen{} of \cdStorageMax{} GB of storage memory, with every partition cached and nothing on disk, and caching only W1's five columns did not help (\cdColsSixteen{} s against \cdNoCacheSixteen{} s from Parquet). The cost lies in scanning Spark's in-memory format; most likely the small Parquet file (\cdParquetSixteen{} GB at 16$\times$) stays in the operating system's file cache, so the uncached run hardly reads the disk either.
+
+\section{Reproducibility}\label{app:repro}
+
+\textbf{Tests.} A \fd{pytest} suite of \nTests{} tests guards the pipeline. It checks the rules file (bands without gaps, 19 DTI levels, 90 cells, real HMDA field names), recomputes headline numbers from the saved tables, plants errors in one engine's output to confirm that the comparison script catches them, and, in \nTestsSlow{} slower tests, runs Pandas, Spark, and the SQL check end to end on a synthetic file.
+
+Four Kaggle notebooks implement the project, one each for the Pandas pipeline, the PySpark pipeline, the performance experiment, and the equivalence check, all run on 15 November 2026; the executed notebooks, with every cell output, are in the repository's \fd{notebooks} folder. Five more notebooks, run on 16 November 2026 and kept in \fd{notebooks/extra}, carry out the work of Sections~3, 4.1, 7, 8, and~9 and Appendix~\ref{app:checks}: the DuckDB implementation, the Data Browser slices, and the subgroup calibration; the open-end sensitivity run; the cache diagnosis; the export of the clean core table; and the distributions of Figure~\ref{fig:products}b--d. Their small outputs are in \fd{results/}, and the \nTests{} tests in \fd{tests/} run against those files. Inputs are the original FFIEC files imported by URL (LAR CSV and Transmittal Sheet), the Parquet file that a conversion notebook writes from that CSV, and the configuration (\fd{rules.yaml} 1.1 and \fd{expected.yaml}), so no notebook needs Internet access. Each notebook checks its counts against \fd{expected.yaml} and writes every table and key number to \fd{results/}; the tables, figures, and run-dependent numbers in this report are written from those files by a script rather than typed by hand; the few sizes quoted in running text (file sizes, row counts in millions) are rounded from the same files.
+
+% Appendix floats. Tables 8-9 ([b] above) sit at the foot of the columns of page 9; the rest fill
+% three float pages, grouped so that each page is filled.
+\begin{table*}[p]
 \caption{Variables and coding rules.}\label{tab:rules}
 \small
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.13\textwidth}L}
@@ -405,7 +450,8 @@ Thresholds & Lenders: $\ge$500 decisioned and $\ge$80\% usable; MSAs: $\ge$1,000
 \bottomrule
 \end{tabularx}
 \end{table*}
-\begin{figure*}[t]
+
+\begin{figure*}[p]
 \centering
 \begin{minipage}[b]{0.46\textwidth}\centering
 \includegraphics[width=0.86\textwidth]{figures/fig_heatmap.pdf}
@@ -414,34 +460,6 @@ Thresholds & Lenders: $\ge$500 decisioned and $\ge$80\% usable; MSAs: $\ge$1,000
 \begin{minipage}[b]{0.46\textwidth}\centering
 \includegraphics[width=0.86\textwidth]{figures/fig_bunching.pdf}
 \caption{Conventional applications by DTI value: bunching at 49.}\label{fig:bunching}
-\end{minipage}
-\end{figure*}
-
-\section{Additional Checks}\label{app:checks}
-
-Table~\ref{tab:jump} gives the DTI jump test of Section~\ref{sec:sqtwo}, Table~\ref{tab:dist} the summary statistics behind Figure~\ref{fig:products}b--d, Table~\ref{tab:kitagawa} the values behind Figure~\ref{fig:kitagawa}, and Table~\ref{tab:clean} the clean core table of Section~3. Table~\ref{tab:openend} shows the open-end sensitivity run of Section~3, a full rerun of the Pandas notebook with the closed-end filter widened to keep exempt open-end flags. Table~\ref{tab:cache} shows the cache diagnosis of Section~8, a rerun of W1 on the performance table with Spark's storage status read after each cache was built.
-
-\textbf{Logistic regression in two libraries (Section~6).} Two rank correlations that Spark derives from the Pandas predictions are left out of the \nKeyNumbers{} key numbers of Table~\ref{tab:eqsummary}, as they are not independent. On identical folds the MLlib and scikit-learn logistic regressions correlate at \corrMLlib; of the \nDiffMLlib{} predictions that differ by more than 0.05, \nDiffMLlibNA{} belong to the \nPurposeNA{} applications with purpose ``not applicable'', where scikit-learn's weak L2 penalty bounds a coefficient that unpenalized MLlib lets drift (elsewhere at most \maxDiffMLlibOther).
-
-\textbf{Cache diagnosis (Section~8).} Building the cache took \cbFull{} s at 100\% and \cbSixteen{} s at 16$\times$, and from 4$\times$ up the cached runs of all three workloads were slower than the uncached ones (Table~\ref{tab:perfdetail}). Memory is not the cause (Table~\ref{tab:cache}): at 16$\times$ the cache used \cdMemSixteen{} of \cdStorageMax{} GB of storage memory, with every partition cached and nothing on disk, and caching only W1's five columns did not help (\cdColsSixteen{} s against \cdNoCacheSixteen{} s from Parquet). The cost lies in scanning Spark's in-memory format; most likely the small Parquet file (\cdParquetSixteen{} GB at 16$\times$) stays in the operating system's file cache, so the uncached run hardly reads the disk either.
-
-\section{Reproducibility}\label{app:repro}
-
-\textbf{Tests.} A \fd{pytest} suite of \nTests{} tests guards the pipeline. It checks the rules file (bands without gaps, 19 DTI levels, 90 cells, real HMDA field names), recomputes headline numbers from the saved tables, plants errors in one engine's output to confirm that the comparison script catches them, and, in \nTestsSlow{} slower tests, runs Pandas, Spark, and the SQL check end to end on a synthetic file.
-
-Four Kaggle notebooks implement the project, one each for the Pandas pipeline, the PySpark pipeline, the performance experiment, and the equivalence check, all run on 15 November 2026; the executed notebooks, with every cell output, are in the repository's \fd{notebooks} folder. Five more notebooks, run on 16 November 2026 and kept in \fd{notebooks/extra}, carry out the work of Sections~3, 4.1, 7, and~8 and Appendix~\ref{app:checks}: the DuckDB implementation, the Data Browser slices, and the subgroup calibration; the open-end sensitivity run; the cache diagnosis; the export of the clean core table; and the distributions of Figure~\ref{fig:products}b--d. Their small outputs are in \fd{results/}, and the \nTests{} tests in \fd{tests/} run against those files. Inputs are the original FFIEC files imported by URL (LAR CSV and Transmittal Sheet), the Parquet file that a conversion notebook writes from that CSV, and the configuration (\fd{rules.yaml} 1.1 and \fd{expected.yaml}), so no notebook needs Internet access. Each notebook checks its counts against \fd{expected.yaml} and writes every table and key number to \fd{results/}; the tables, figures, and run-dependent numbers in this report are written from those files by a script rather than typed by hand; the few sizes quoted in running text (file sizes, row counts in millions) are rounded from the same files.
-
-% Appendix figures and tables: Table 8 and Figures 5-6 share page 10 with the end of the text;
-% the rest fill float pages, grouped so that the pages are evenly filled.
-\begin{figure*}[p]
-\centering
-\begin{minipage}[b]{0.46\textwidth}\centering
-\includegraphics[width=0.86\textwidth]{figures/fig_twoway.pdf}
-\caption{Distribution of two-way lender and MSA effects (clipped at $-30$ and $+45$ points).}\label{fig:twoway}
-\end{minipage}\hfill
-\begin{minipage}[b]{0.46\textwidth}\centering
-\includegraphics[width=0.86\textwidth]{figures/fig_calibration.pdf}
-\caption{Calibration of out-of-fold predictions by decile.}\label{fig:calibration}
 \end{minipage}
 \end{figure*}
 
@@ -472,6 +490,19 @@ Field & \fd{NA} & \fd{Exempt} & Numeric & Other \\
 \end{tabular}
 \end{minipage}
 \end{table*}
+\clearpage
+
+\begin{figure*}[p]
+\centering
+\begin{minipage}[b]{0.46\textwidth}\centering
+\includegraphics[width=0.86\textwidth]{figures/fig_twoway.pdf}
+\caption{Distribution of two-way lender and MSA effects (clipped at $-30$ and $+45$ points).}\label{fig:twoway}
+\end{minipage}\hfill
+\begin{minipage}[b]{0.46\textwidth}\centering
+\includegraphics[width=0.86\textwidth]{figures/fig_calibration.pdf}
+\caption{Calibration of out-of-fold predictions by decile.}\label{fig:calibration}
+\end{minipage}
+\end{figure*}
 
 \begin{table*}[p]
 \caption{Performance detail: medians in seconds. Pandas W1--W3 run on data already in memory (warm); Spark ``cached'' runs use a table cached beforehand (build time shown separately), ``direct'' runs read Parquet within the action; stopped as in Table~\ref{tab:perf}.}\label{tab:perfdetail}
@@ -487,10 +518,9 @@ Size & Load & W1 & W2 & W3 & Start & Build cache & W1 cached & W1 direct & W2 ca
 \bottomrule
 \end{tabular}
 \end{table*}
-\clearpage
 
 \begin{table*}[p]
-\begin{minipage}[t]{0.55\textwidth}
+\begin{minipage}[t]{0.52\textwidth}
 \caption{DTI jump test: change in denial rate between adjacent DTI values minus the mean step within 36--49 (percentage points). $^{*}$ 95\% confidence interval excludes zero. Bunching: applications at DTI 49 divided by the mean at 44--48.}\label{tab:jump}
 \footnotesize
 \setlength{\tabcolsep}{3.2pt}
@@ -504,19 +534,22 @@ Scope & 49$\to$50--60 & 42$\to$43 & 44$\to$45 & 39$\to$40 & 46$\to$47 & Bunching
 \bottomrule
 \end{tabular}
 \end{minipage}\hfill
-\begin{minipage}[t]{0.40\textwidth}
-\caption{Clean core table kept as a notebook output; rows per state and column types are in \texttt{results/clean/}.}\label{tab:clean}
+\begin{minipage}[t]{0.46\textwidth}
+\caption{Kitagawa decomposition of denial gaps over 90 risk cells (percentage points, group A minus group B). Last column: cells where A is denied more than B, out of cells with both groups.}\label{tab:kitagawa}
 \footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\textwidth}{Lr}
+\setlength{\tabcolsep}{2.6pt}
+\begin{tabular}{lrrrrrr}
 \toprule
-Item & Value \\
+& & & & \multicolumn{2}{c}{Rate at mix of} & \\
+\cmidrule(lr){5-6}
+A vs B & Gap & Comp. & Rate & A & B & A higher \\
 \midrule
-\tabin{tables/clean.tex}
+\tabin{tables/kitagawa.tex}
 \bottomrule
-\end{tabularx}
+\end{tabular}
 \end{minipage}
 \end{table*}
+\clearpage
 
 \begin{table*}[p]
 \caption{Summary statistics of the financial variables, core sample; every value was computed in both Pandas and PySpark and agrees. Payment-to-income: monthly principal and interest over monthly income. Interest rates outside $[0, 20]$\% and terms outside $(0, 480]$ months are excluded, as in \texttt{rules.yaml}. The large SD of income comes from a few very high reported incomes (Table~\ref{tab:dq}).}\label{tab:dist}
@@ -532,36 +565,6 @@ Variable, sample & $n$ & Mean & SD & p10 & p25 & Median & p75 & p90 & Conv. & FH
 \bottomrule
 \end{tabular}
 \end{table*}
-
-\begin{table*}[p]
-\begin{minipage}[t]{0.5\textwidth}
-\caption{Kitagawa decomposition of denial gaps over 90 risk cells (percentage points, group A minus group B). Last column: cells where A is denied more than B, out of cells with both groups.}\label{tab:kitagawa}
-\footnotesize
-\setlength{\tabcolsep}{2.6pt}
-\begin{tabular}{lrrrrrr}
-\toprule
-& & & & \multicolumn{2}{c}{Rate at mix of} & \\
-\cmidrule(lr){5-6}
-A vs B & Gap & Comp. & Rate & A & B & A higher \\
-\midrule
-\tabin{tables/kitagawa.tex}
-\bottomrule
-\end{tabular}
-\end{minipage}\hfill
-\begin{minipage}[t]{0.46\textwidth}
-\caption{Sensitivity to records whose open-end flag is exempt (gaps and jumps in percentage points).}\label{tab:openend}
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\textwidth}{Lrr}
-\toprule
-Quantity & Main & With exempt flags \\
-\midrule
-\tabin{tables/open_end.tex}
-\bottomrule
-\end{tabularx}
-\end{minipage}
-\end{table*}
-\clearpage
 
 \begin{table*}[p]
 \caption{Why caching did not pay off: W1 on the performance table, same machine as Table~\ref{tab:perf}. Full: all 15 columns cached; Cols: only the five W1 reads. Storage memory \cdStorageMax{} GB; times are medians of three runs.}\label{tab:cache}

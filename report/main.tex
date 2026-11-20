@@ -30,7 +30,7 @@
 % allow slightly looser lines instead of lines running into the margin of the narrow columns
 \setlength{\emergencystretch}{1.5em}
 
-\setcounter{dbltopnumber}{4}
+\setcounter{dbltopnumber}{2}
 \setcounter{topnumber}{3}
 \setcounter{totalnumber}{6}
 \begin{document}
@@ -355,6 +355,38 @@ Gradient boosting ranks applications better than logistic regression (ROC-AUC \a
 
 Across 4.1 million applications whose risk we can measure, observable risk explains most of the FHA--conventional denial gap on average but not its shape, explains almost none of the cash-out refinance gap, and reveals a sharp underwriting threshold at 50\% DTI rather than 43\%. The lender, not the metropolitan area, is the main source of variation in risk-adjusted denial and pricing. Pandas and PySpark agree on every number we compared, and an independent SQL version and the FFIEC's own aggregates confirm them. Pandas hits our memory budget between \lastRows{} and \oomRows{} million rows; Spark pays off for grouped aggregations from about 3 million rows read from disk or 23 million in memory, while Pandas stayed faster on the iterative workload up to 46 million rows.
 
+\clearpage
+\setcounter{dbltopnumber}{4}
+\renewcommand{\dbltopfraction}{0.9}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\dblfloatpagefraction}{0.3}
+\renewcommand{\floatpagefraction}{0.3}
+\makeatletter\setlength{\@dblfptop}{0pt}\setlength{\@dblfpsep}{16pt plus 4pt}\setlength{\@dblfpbot}{0pt plus 1fil}\makeatother
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\appendix
+
+\section{Variables and Coding Rules Verified in the 2024 File}\label{app:rules}
+
+Table~\ref{tab:rules} lists the fields used for each sub-question and every coding rule applied to them.
+
+\section{Supplementary Results}\label{app:supp}
+
+Figures~\ref{fig:heatmap}--\ref{fig:perf} and Tables~\ref{tab:sens}--\ref{tab:perfdetail} back the main text; the paragraphs below give the details summarized there.
+
+\textbf{Low DTI and CLTV (Section~\ref{sec:sqtwo}).}\label{app:lowdti} Applications with DTI below 20\% are denied at \drDTIlowTwenty\%, more than the \drDTItwentyThirty\% at 20--30\%. These applicants earn more (median income \$\lowDTIincome{}k against \$\midDTIincome{}k) and have lower CLTV, but credit history is cited in \lowDTIcredit\% of their denials, against \midDTIcredit\% at 20--30\%. Low DTI therefore points to a different group of applicants rather than a safer one: \lowDTInonPurchase\% of their applications are not purchases (against \midDTInonPurchase\%), and their median CLTV is \lowDTIcltv\%. CLTV shows the same U shape. Denial is \drCLTVlow\% at CLTV $\le$80\%, where cash-out refinancing is concentrated (\convCashoutLeEighty\% of conventional cash-out originations), \drCLTVmid\% at 90--95\%, and \drCLTVhigh\% above 100\%.
+
+\textbf{Pricing (Section~\ref{sec:sqtwo}).}\label{app:pricing} Among conventional loans, cash-out loans pay \psCOconvGap{} points more in spread than purchases, and all of it is within cells (rate part \psCOconvRate{}; purchase coverage \psCOconvCov\%). Dropping spreads above 5 points leaves the gap at \psCOconvGapFive. For VA loans the within-cell gap is larger (\psCOvaRate{} points), and composition partly offsets it (\psCOvaComp). Only \fhaCashoutGtEighty\% of FHA cash-out loans have CLTV above 80\%, so they share cells with just \psCOfhaCov\% of FHA purchases, too few for us to interpret that decomposition.
+
+\textbf{Places without a region (Section~4.3).}\label{app:geo} We report Puerto Rico ($O/E=\oePR$) and the \nNoState{} usable applications with no state ($O/E=\oeNoState$) separately. Of the \nNoStateDec{} decisioned ones, \noStateNoTract{} also lack a tract, so they are records missing a location, not a region.
+
+\textbf{Lenders (Section~\ref{sec:sqfour}).}\label{app:lenders} The expected rate is weighted by applications and so driven by large lenders; most lenders sit below 1, which inflates the share outside a funnel centred on 1, but not $\tau$, which measures spread around the mean. Weighted by applications, $\tau$ is \tauLenderW{} for lenders and \tauMSAW{} for MSAs. Median $O/E$ is \agHUD{} for the \nHUD{} lenders supervised through HUD (independent mortgage companies) and \agCFPB{} for the large banks supervised by the CFPB. The correction makes little difference here (\twLenderFullSD{} points before it), since only \twLeTwoShare\% of lenders work in two or fewer MSAs. We ran 40 alternating iterations, and the last one moved no effect by more than $\twLastChange$. The result is robust: $\tau$ is \tauLenderConv{} within conventional loans and \tauLenderFHA{} within FHA (rank correlations with the main ratio of \rhoConv{} and \rhoFHA), and it stays between \tauSensMin{} and \tauSensMax{} when we change the cell, lender-size, and usable-share thresholds. Rankings by raw denial barely move when withdrawn and incomplete applications are added to the denominator ($\rho=\rhoDef$). Pricing tells the same story: the spread $\tau$ is \spreadTauLender{} points across \nSpreadLender{} lenders, against \spreadTauMSA{} across MSAs. How concentrated lending is in an MSA (median HHI \hhiMedian, 10th--90th percentile \hhiPten--\hhiPninety) has only a weak link with its denial ratio ($\rho=\rhoHHI$).
+
+\textbf{Prediction by subgroup (Section~9).}\label{app:predsub} The logistic model underpredicts in its lowest decile (\calLRlowPred\% predicted, \calLRlowObs\% observed). Within subgroups, the mean prediction stays within \predMaxCITL{} points of the observed rate for every loan type, purpose, and DTI band, but both models underpredict denial in LMI tracts (gradient boosting \predLMIgb\%, logistic \predLMIlr\%, observed \predLMIobs\%), because location is deliberately left out; this is the within-cell LMI gap of SQ3 seen from the model side. For the \predUnkN{} applications without a tract the shortfall is larger (\predUnkGB\% against \predUnkObs\%).
+
 \begin{table*}[t]
 \caption{Variables and coding rules.}\label{tab:rules}
 \small
@@ -373,7 +405,6 @@ Thresholds & Lenders: $\ge$500 decisioned and $\ge$80\% usable; MSAs: $\ge$1,000
 \bottomrule
 \end{tabularx}
 \end{table*}
-
 \begin{figure*}[t]
 \centering
 \begin{minipage}[b]{0.46\textwidth}\centering
@@ -386,7 +417,23 @@ Thresholds & Lenders: $\ge$500 decisioned and $\ge$80\% usable; MSAs: $\ge$1,000
 \end{minipage}
 \end{figure*}
 
-\begin{figure*}[t]
+\section{Additional Checks}\label{app:checks}
+
+Table~\ref{tab:jump} gives the DTI jump test of Section~\ref{sec:sqtwo}, Table~\ref{tab:dist} the summary statistics behind Figure~\ref{fig:products}b--d, Table~\ref{tab:kitagawa} the values behind Figure~\ref{fig:kitagawa}, and Table~\ref{tab:clean} the clean core table of Section~3. Table~\ref{tab:openend} shows the open-end sensitivity run of Section~3, a full rerun of the Pandas notebook with the closed-end filter widened to keep exempt open-end flags. Table~\ref{tab:cache} shows the cache diagnosis of Section~8, a rerun of W1 on the performance table with Spark's storage status read after each cache was built.
+
+\textbf{Logistic regression in two libraries (Section~6).} Two rank correlations that Spark derives from the Pandas predictions are left out of the \nKeyNumbers{} key numbers of Table~\ref{tab:eqsummary}, as they are not independent. On identical folds the MLlib and scikit-learn logistic regressions correlate at \corrMLlib; of the \nDiffMLlib{} predictions that differ by more than 0.05, \nDiffMLlibNA{} belong to the \nPurposeNA{} applications with purpose ``not applicable'', where scikit-learn's weak L2 penalty bounds a coefficient that unpenalized MLlib lets drift (elsewhere at most \maxDiffMLlibOther).
+
+\textbf{Cache diagnosis (Section~8).} Building the cache took \cbFull{} s at 100\% and \cbSixteen{} s at 16$\times$, and from 4$\times$ up the cached runs of all three workloads were slower than the uncached ones (Table~\ref{tab:perfdetail}). Memory is not the cause (Table~\ref{tab:cache}): at 16$\times$ the cache used \cdMemSixteen{} of \cdStorageMax{} GB of storage memory, with every partition cached and nothing on disk, and caching only W1's five columns did not help (\cdColsSixteen{} s against \cdNoCacheSixteen{} s from Parquet). The cost lies in scanning Spark's in-memory format; most likely the small Parquet file (\cdParquetSixteen{} GB at 16$\times$) stays in the operating system's file cache, so the uncached run hardly reads the disk either.
+
+\section{Reproducibility}\label{app:repro}
+
+\textbf{Tests.} A \fd{pytest} suite of \nTests{} tests guards the pipeline. It checks the rules file (bands without gaps, 19 DTI levels, 90 cells, real HMDA field names), recomputes headline numbers from the saved tables, plants errors in one engine's output to confirm that the comparison script catches them, and, in \nTestsSlow{} slower tests, runs Pandas, Spark, and the SQL check end to end on a synthetic file.
+
+Four Kaggle notebooks implement the project, one each for the Pandas pipeline, the PySpark pipeline, the performance experiment, and the equivalence check, all run on 15 November 2026; the executed notebooks, with every cell output, are in the repository's \fd{notebooks} folder. Five more notebooks, run on 16 November 2026 and kept in \fd{notebooks/extra}, carry out the work of Sections~3, 4.1, 7, and~8 and Appendix~\ref{app:checks}: the DuckDB implementation, the Data Browser slices, and the subgroup calibration; the open-end sensitivity run; the cache diagnosis; the export of the clean core table; and the distributions of Figure~\ref{fig:products}b--d. Their small outputs are in \fd{results/}, and the \nTests{} tests in \fd{tests/} run against those files. Inputs are the original FFIEC files imported by URL (LAR CSV and Transmittal Sheet), the Parquet file that a conversion notebook writes from that CSV, and the configuration (\fd{rules.yaml} 1.1 and \fd{expected.yaml}), so no notebook needs Internet access. Each notebook checks its counts against \fd{expected.yaml} and writes every table and key number to \fd{results/}; the tables, figures, and run-dependent numbers in this report are written from those files by a script rather than typed by hand; the few sizes quoted in running text (file sizes, row counts in millions) are rounded from the same files.
+
+% Appendix figures and tables: Table 8 and Figures 5-6 share page 10 with the end of the text;
+% the rest fill float pages, grouped so that the pages are evenly filled.
+\begin{figure*}[p]
 \centering
 \begin{minipage}[b]{0.46\textwidth}\centering
 \includegraphics[width=0.86\textwidth]{figures/fig_twoway.pdf}
@@ -398,7 +445,7 @@ Thresholds & Lenders: $\ge$500 decisioned and $\ge$80\% usable; MSAs: $\ge$1,000
 \end{minipage}
 \end{figure*}
 
-\begin{table*}[t]
+\begin{table*}[p]
 \begin{minipage}[t]{0.48\textwidth}
 \caption{Sensitivity of lender $O/E$ dispersion to thresholds and scope.}\label{tab:sens}
 \footnotesize
@@ -426,7 +473,7 @@ Field & \fd{NA} & \fd{Exempt} & Numeric & Other \\
 \end{minipage}
 \end{table*}
 
-\begin{table*}[t]
+\begin{table*}[p]
 \caption{Performance detail: medians in seconds. Pandas W1--W3 run on data already in memory (warm); Spark ``cached'' runs use a table cached beforehand (build time shown separately), ``direct'' runs read Parquet within the action; stopped as in Table~\ref{tab:perf}.}\label{tab:perfdetail}
 \small
 \setlength{\tabcolsep}{3.6pt}
@@ -440,8 +487,9 @@ Size & Load & W1 & W2 & W3 & Start & Build cache & W1 cached & W1 direct & W2 ca
 \bottomrule
 \end{tabular}
 \end{table*}
+\clearpage
 
-\begin{table*}[t]
+\begin{table*}[p]
 \begin{minipage}[t]{0.55\textwidth}
 \caption{DTI jump test: change in denial rate between adjacent DTI values minus the mean step within 36--49 (percentage points). $^{*}$ 95\% confidence interval excludes zero. Bunching: applications at DTI 49 divided by the mean at 44--48.}\label{tab:jump}
 \footnotesize
@@ -470,7 +518,7 @@ Item & Value \\
 \end{minipage}
 \end{table*}
 
-\begin{table*}[t]
+\begin{table*}[p]
 \caption{Summary statistics of the financial variables, core sample; every value was computed in both Pandas and PySpark and agrees. Payment-to-income: monthly principal and interest over monthly income. Interest rates outside $[0, 20]$\% and terms outside $(0, 480]$ months are excluded, as in \texttt{rules.yaml}. The large SD of income comes from a few very high reported incomes (Table~\ref{tab:dq}).}\label{tab:dist}
 \small
 \setlength{\tabcolsep}{3.4pt}
@@ -485,7 +533,7 @@ Variable, sample & $n$ & Mean & SD & p10 & p25 & Median & p75 & p90 & Conv. & FH
 \end{tabular}
 \end{table*}
 
-\begin{table*}[t]
+\begin{table*}[p]
 \begin{minipage}[t]{0.5\textwidth}
 \caption{Kitagawa decomposition of denial gaps over 90 risk cells (percentage points, group A minus group B). Last column: cells where A is denied more than B, out of cells with both groups.}\label{tab:kitagawa}
 \footnotesize
@@ -513,8 +561,9 @@ Quantity & Main & With exempt flags \\
 \end{tabularx}
 \end{minipage}
 \end{table*}
+\clearpage
 
-\begin{table*}[t]
+\begin{table*}[p]
 \caption{Why caching did not pay off: W1 on the performance table, same machine as Table~\ref{tab:perf}. Full: all 15 columns cached; Cols: only the five W1 reads. Storage memory \cdStorageMax{} GB; times are medians of three runs.}\label{tab:cache}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
@@ -529,60 +578,26 @@ Size & Rows (M) & Full & Cols & Full & Cols & (GB) & cached & Parquet & Full & C
 \end{tabular}
 \end{table*}
 
-\begin{figure*}[t]
+\begin{figure*}[p]
 \centering
 \includegraphics[width=0.96\textwidth]{figures/fig_perf.pdf}
 \caption{Scaling of time and memory. (a) Median time of W1 and W3 in memory: Pandas with the table loaded and Spark on a cached table. (b) The same from disk: Pandas reading the table and Spark reading Parquet within the action. (c) Peak memory of the whole process, including Spark's JVM; the cross marks the Pandas run stopped at the budget while loading the table.}\label{fig:perf}
 \end{figure*}
 
-\begin{table}[t]
+\begin{table*}[p]
+\centering
+\begin{minipage}{0.55\textwidth}
 \caption{Three independent checks of the results.}\label{tab:verify}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\columnwidth}{Lrrc}
+\begin{tabularx}{\textwidth}{Lrrc}
 \toprule
 Check & Values & Max.\ rel.\ diff. & Agree \\
 \midrule
 \tabin{tables/verify.tex}
 \bottomrule
 \end{tabularx}
-\end{table}
-
-\bibliographystyle{ACM-Reference-Format}
-\bibliography{references}
-
-\appendix
-
-\section{Variables and Coding Rules Verified in the 2024 File}\label{app:rules}
-
-Table~\ref{tab:rules} lists the fields used for each sub-question and every coding rule applied to them.
-
-\section{Supplementary Results}\label{app:supp}
-
-Figures~\ref{fig:heatmap}--\ref{fig:calibration} and Tables~\ref{tab:sens}--\ref{tab:perfdetail} support the main text, and Figure~\ref{fig:perf} plots the performance results of Section~8. The paragraphs below give the details summarized there.
-
-\textbf{Low DTI and CLTV (Section~\ref{sec:sqtwo}).}\label{app:lowdti} Applications with DTI below 20\% are denied at \drDTIlowTwenty\%, more than the \drDTItwentyThirty\% at 20--30\%. These applicants earn more (median income \$\lowDTIincome{}k against \$\midDTIincome{}k) and have lower CLTV, but credit history is cited in \lowDTIcredit\% of their denials, against \midDTIcredit\% at 20--30\%. Low DTI therefore points to a different group of applicants rather than a safer one: \lowDTInonPurchase\% of their applications are not purchases (against \midDTInonPurchase\%), their median CLTV is \lowDTIcltv\%, and they are turned down over credit history rather than affordability. CLTV shows the same U shape. Denial is \drCLTVlow\% at CLTV $\le$80\%, where cash-out refinancing is concentrated (\convCashoutLeEighty\% of conventional cash-out originations), \drCLTVmid\% at 90--95\%, and \drCLTVhigh\% above 100\%.
-
-\textbf{Pricing (Section~\ref{sec:sqtwo}).}\label{app:pricing} Among conventional loans, cash-out loans pay \psCOconvGap{} points more in spread than purchases, and all of it is within cells (rate part \psCOconvRate{}; purchase coverage \psCOconvCov\%). Dropping spreads above 5 points leaves the gap at \psCOconvGapFive. For VA loans the within-cell gap is larger (\psCOvaRate{} points), and composition partly offsets it (\psCOvaComp). Only \fhaCashoutGtEighty\% of FHA cash-out loans have CLTV above 80\%, so they share cells with just \psCOfhaCov\% of FHA purchases, too few for us to interpret that decomposition.
-
-\textbf{Places without a region (Section~4.3).}\label{app:geo} We report Puerto Rico ($O/E=\oePR$) and the \nNoState{} usable applications with no state ($O/E=\oeNoState$) separately. Of the \nNoStateDec{} decisioned ones, \noStateNoTract{} also lack a tract, so they are records missing a location, not a region.
-
-\textbf{Lenders (Section~\ref{sec:sqfour}).}\label{app:lenders} The expected rate is weighted by applications and so driven by large lenders; most lenders sit below 1, which inflates the share outside a funnel centred on 1, but not $\tau$, which measures spread around the mean. Weighted by applications, $\tau$ is \tauLenderW{} for lenders and \tauMSAW{} for MSAs. Median $O/E$ is \agHUD{} for the \nHUD{} lenders supervised through HUD (independent mortgage companies) and \agCFPB{} for the large banks supervised by the CFPB. The correction makes little difference here (\twLenderFullSD{} points before it), since only \twLeTwoShare\% of lenders work in two or fewer MSAs. We ran 40 alternating iterations, and the last one moved no effect by more than $\twLastChange$. The result is robust: $\tau$ is \tauLenderConv{} within conventional loans and \tauLenderFHA{} within FHA (rank correlations with the main ratio of \rhoConv{} and \rhoFHA), and it stays between \tauSensMin{} and \tauSensMax{} when we change the cell, lender-size, and usable-share thresholds. Rankings by raw denial barely move when withdrawn and incomplete applications are added to the denominator ($\rho=\rhoDef$). Pricing tells the same story: the spread $\tau$ is \spreadTauLender{} points across \nSpreadLender{} lenders, against \spreadTauMSA{} across MSAs. How concentrated lending is in an MSA (median HHI \hhiMedian, 10th--90th percentile \hhiPten--\hhiPninety) has only a weak link with its denial ratio ($\rho=\rhoHHI$).
-
-\textbf{Prediction by subgroup (Section~9).}\label{app:predsub} The logistic model underpredicts in its lowest decile (\calLRlowPred\% predicted, \calLRlowObs\% observed). Within subgroups, the mean prediction stays within \predMaxCITL{} points of the observed rate for every loan type, purpose, and DTI band, but both models underpredict denial in LMI tracts (gradient boosting \predLMIgb\%, logistic \predLMIlr\%, observed \predLMIobs\%), because location is deliberately left out; this is the within-cell LMI gap of SQ3 seen from the model side. For the \predUnkN{} applications without a tract the shortfall is larger (\predUnkGB\% against \predUnkObs\%).
-
-\section{Additional Checks}\label{app:checks}
-
-Table~\ref{tab:jump} gives the DTI jump test of Section~\ref{sec:sqtwo}, Table~\ref{tab:dist} the summary statistics behind Figure~\ref{fig:products}b--d, Table~\ref{tab:kitagawa} the values behind Figure~\ref{fig:kitagawa}, and Table~\ref{tab:clean} the clean core table of Section~3. Table~\ref{tab:openend} shows the open-end sensitivity run of Section~3, a full rerun of the Pandas notebook with the closed-end filter widened to keep exempt open-end flags. Table~\ref{tab:cache} shows the cache diagnosis of Section~8, a rerun of W1 on the performance table with Spark's storage status read after each cache was built.
-
-\textbf{Logistic regression in two libraries (Section~6).} Two rank correlations that Spark derives from the Pandas predictions are left out of the \nKeyNumbers{} key numbers of Table~\ref{tab:eqsummary}, as they are not independent. Predictions from different libraries need not match exactly. On identical folds the MLlib and scikit-learn logistic regressions correlate at \corrMLlib; of the \nDiffMLlib{} predictions that differ by more than 0.05, \nDiffMLlibNA{} belong to the \nPurposeNA{} applications with purpose ``not applicable'', where scikit-learn's weak L2 penalty bounds a coefficient that unpenalized MLlib lets drift (elsewhere at most \maxDiffMLlibOther).
-
-\textbf{Cache diagnosis (Section~8).} Building the cache took \cbFull{} s at 100\% and \cbSixteen{} s at 16$\times$, and from 4$\times$ up the cached runs of all three workloads were slower than the uncached ones (Table~\ref{tab:perfdetail}). Memory is not the cause (Table~\ref{tab:cache}): at 16$\times$ the cache used \cdMemSixteen{} of \cdStorageMax{} GB of storage memory, with every partition cached and nothing on disk, and caching only W1's five columns did not help (\cdColsSixteen{} s against \cdNoCacheSixteen{} s from Parquet). The cost lies in scanning Spark's in-memory format; most likely the small Parquet file (\cdParquetSixteen{} GB at 16$\times$) stays in the operating system's file cache, so the uncached run hardly reads the disk either.
-
-\section{Reproducibility}\label{app:repro}
-
-\textbf{Tests.} A \fd{pytest} suite of \nTests{} tests guards the pipeline. It checks the rules file (bands without gaps, 19 DTI levels, 90 cells, real HMDA field names), recomputes headline numbers from the saved tables, plants errors in one engine's output to confirm that the comparison script catches them, and, in \nTestsSlow{} slower tests, runs Pandas, Spark, and the SQL check end to end on a synthetic file.
-
-Four Kaggle notebooks implement the project, one each for the Pandas pipeline, the PySpark pipeline, the performance experiment, and the equivalence check, all run on 15 November 2026; the executed notebooks, with every cell output, are in the repository's \fd{notebooks} folder. Five more notebooks, run on 16 November 2026 and kept in \fd{notebooks/extra}, carry out the work of Sections~3, 4.1, 7, and~8 and Appendix~\ref{app:checks}: the DuckDB implementation, the Data Browser slices, and the subgroup calibration; the open-end sensitivity run; the cache diagnosis; the export of the clean core table; and the distributions of Figure~\ref{fig:products}b--d. Their small outputs are in \fd{results/}, and the \nTests{} tests in \fd{tests/} run against those files. Inputs are the original FFIEC files imported by URL (LAR CSV and Transmittal Sheet), the Parquet file that a conversion notebook writes from that CSV, and the configuration (\fd{rules.yaml} 1.1 and \fd{expected.yaml}), so no notebook needs Internet access. Each notebook checks its counts against \fd{expected.yaml} and writes every table and key number to \fd{results/}; the tables, figures, and run-dependent numbers in this report are written from those files by a script rather than typed by hand; the few sizes quoted in running text (file sizes, row counts in millions) are rounded from the same files.
+\end{minipage}
+\end{table*}
 
 \end{document}

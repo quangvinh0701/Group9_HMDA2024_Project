@@ -47,7 +47,7 @@
 \title[Mortgage Credit Access and Pricing in 2024]{Mortgage Credit Access and Pricing in 2024: A Large-Scale HMDA Analysis Across Products, Regions, and Lenders}
 \subtitle{Big Data Analysis Final Project\\Instructor: Huan Vu, Faculty of DS\&AI, National Economics University}
 
-\author{\NoCaseChange{\normalfont\normalsize Group 9 \textbar{} 11230786 -- Bùi Quang Vinh \textbar{} 11230773 -- Đinh Hồng Sơn \textbar{} 11230739 -- Nguyễn Tiến Công}}
+\author{\NoCaseChange{\normalfont\large Group 9 \textbar{} 11230786 -- Bùi Quang Vinh \textbar{} 11230773 -- Đinh Hồng Sơn \textbar{} 11230739 -- Nguyễn Tiến Công}}
 
 \renewcommand{\shortauthors}{Group 9}
 
@@ -345,6 +345,7 @@ Gradient boosting ranks applications better than logistic regression (ROC-AUC \a
 
 Across 4.1 million applications whose risk we can measure, observable risk explains most of the FHA--conventional denial gap on average but not its shape, explains almost none of the cash-out refinance gap, and reveals a sharp underwriting threshold at 50\% DTI. The lender, not the metropolitan area, is the main source of variation in risk-adjusted denial and pricing. Pandas and PySpark agree on every number we compared, and an independent SQL version and the FFIEC's own aggregates confirm them. Pandas hits our memory budget between \lastRows{} and \oomRows{} million rows; Spark pays off for grouped aggregations from about 3 million rows read from disk or 23 million in memory, while Pandas stayed faster on the iterative workload up to 46 million rows.
 
+\clearpage
 \setcounter{dbltopnumber}{4}
 \renewcommand{\dbltopfraction}{0.9}
 \renewcommand{\topfraction}{0.9}

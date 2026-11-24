@@ -805,6 +805,26 @@ lines = [f"{lab} & {_f(oe_.loc[k, 'main'], kind)} & {_f(oe_.loc[k, 'sensitivity'
 lines.append(f"Spearman $\\rho$ of lender $O/E$ & & {MAC['oeSpearman']} \\\\")
 open(os.path.join(TAB, "open_end.tex"), "w").write("\n".join(lines) + "\n")
 
+# sample construction (waterfall, Section 3)
+WF = [("all_records", "All records in the file", None),
+      ("applications", "Applications (action taken 1--5)", "all_records"),
+      ("first_lien", "First lien", "applications"),
+      ("closed_end", "Closed-end (open-end flag 2)$^{a}$", "first_lien"),
+      ("non_business", "Not for business purposes", "closed_end"),
+      ("non_reverse", "Not a reverse mortgage", "non_business"),
+      ("site_built_1_4_unit", "Site-built, 1--4 units", "non_reverse"),
+      ("principal_residence", "Principal residence = core", "site_built_1_4_unit"),
+      ("decisioned", "Decisioned (action taken 1--3)", "principal_residence"),
+      ("usable", "Usable (valid DTI, CLTV, income)", "decisioned"),
+      ("pricing", "Pricing, from core (originated, spread in $[-8, 15]$)", "principal_residence")]
+lines = []
+for k, lab, prev in WF:
+    rem = "" if prev is None else fmt_int(eq1[prev] - eq1[k])
+    if k == "decisioned":
+        lines.append("\\midrule")
+    lines.append(f"{lab} & {fmt_int(eq1[k])} & {rem} \\\\")
+open(os.path.join(TAB, "waterfall.tex"), "w").write("\n".join(lines) + "\n")
+
 # data checks notebook (input hash, conversion cost, duplicates in samples, DTI gaps by lender, plausibility)
 _dc = os.path.join(RES, "data_checks", "data_checks.json")
 if os.path.exists(_dc):

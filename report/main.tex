@@ -120,9 +120,22 @@ No state, decisioned (usable) & \nNoStateDec{} (\nNoState) & Reported separately
 
 \section{Data Engineering and Preparation}
 
-\textbf{Storage.} A PyArrow script converts the CSV to Parquet, keeping every column as text (so no CSV reader can quietly turn \fd{NA} into a null) and adding a row identifier. Both pipelines start from this file and read the same versioned rules file (\fd{rules.yaml}, frozen at version 1.1), which fixes every filter, code mapping, band, and threshold. Each run also checks itself against verified counts in \fd{expected.yaml}. The prepared analytical table is the core sample (\nCore{} rows): the row identifier, nine raw fields kept as published (identifiers and codes), and typed derived fields (ratios, amounts, the DTI ordinal, and the outcome as doubles, sample flags as booleans, bands and labels as text). Spark writes this table as Parquet partitioned by \fd{state_code}. With 55 values, state is the key of the geographic summaries, so a state query reads only its own folder; county, with over 3,000 values, would produce many small files. Parquet reads only the columns a query needs, compresses well, and stores the schema. Pandas builds the same table in memory. A separate notebook keeps the Spark-written table as a downloadable output (\cleanRows{} rows, \cleanCols{} columns, \cleanParts{} state folders, \cleanMB{} MB) and compares it with the Pandas table row by row: all \cleanCmp{} shared columns agree on every row.
+\textbf{Storage.} A PyArrow script converts the CSV to Parquet, keeping every column as text (so no CSV reader can quietly turn \fd{NA} into a null) and adding a row identifier. On Kaggle the conversion takes \convSec{} s and at most \convPeak{} GiB of memory. Both pipelines start from this file and read the same versioned rules file (\fd{rules.yaml}, frozen at version 1.1), which fixes every filter, code mapping, band, and threshold. Each run also checks itself against verified counts in \fd{expected.yaml}. The prepared analytical table is the core sample (\nCore{} rows): the row identifier, nine raw fields kept as published (identifiers and codes), and typed derived fields (ratios, amounts, the DTI ordinal, and the outcome as doubles, sample flags as booleans, bands and labels as text). Spark writes this table as Parquet partitioned by \fd{state_code}. With 55 values, state is the key of the geographic summaries, so a state query reads only its own folder; county, with over 3,000 values, would produce many small files. Parquet reads only the columns a query needs, compresses well, and stores the schema. Pandas builds the same table in memory. A separate notebook keeps the Spark-written table as a downloadable output (\cleanRows{} rows, \cleanCols{} columns, \cleanParts{} state folders, \cleanMB{} MB) and compares it with the Pandas table row by row: all \cleanCmp{} shared columns agree on every row.
 
-\textbf{Samples.} The core sample keeps first-lien, closed-end, non-business, non-reverse applications for owner-occupied, site-built homes with 1--4 units: \nAll{} $\to$ \nApps{} applications $\to$ \nFirstLien{} first lien $\to$ \nClosedEnd{} closed-end (excluding \nOpenEndExempt{} records whose open-end flag is exempt; see below) $\to$ \nNonBusiness{} non-business $\to$ \nNonReverse{} non-reverse $\to$ \nSiteBuilt{} site-built with 1--4 units $\to$ \nCore{} principal residence. We drop second homes and investment properties (\nNonPrincipal{} applications) because at that step they make up \occConv\% of conventional applications but at most \occGovMax\% of FHA, VA, and USDA applications; occupancy would otherwise confound the product comparison. The denial rate is $n_3/(n_1+n_2+n_3)$ over the \nDecisioned{} decisioned applications. Of these, \nUsable{} (\shareUsable\%) have valid DTI, CLTV, and income; we call them the \emph{usable} sample. The \nExcluded{} decisioned applications we leave out are denied at \drExcluded\%, compared with \baseRate\% in the usable sample, so risk-adjusted results describe complete applications only. Our proposal planned a check that adds back the records with an exempt open-end flag. It changes almost nothing: only \oeAddBusiness{} of the \nOpenEndExempt{} pass the next filter (business purpose), \oeAddCore{} reach the core sample and \oeAddUsable{} the usable sample, and none of the \oeNStats{} key results we tracked moves by more than $\oeMaxAbs\times10^{\oeMaxAbsExp}$ (Appendix~\ref{app:checks}, Table~\ref{tab:openend}). For pricing we use \nPricing{} originations with a valid rate spread and compare spreads only within a loan type, because FHA APRs include the upfront insurance premium. We use the rate spread rather than the interest rate because it is measured against the average prime offer rate on the day the rate was set, which removes market-rate movements during the year.
+\textbf{Samples.} The core sample keeps first-lien, closed-end, non-business, non-reverse applications for owner-occupied, site-built homes with 1--4 units: \nAll{} $\to$ \nApps{} applications $\to$ \nFirstLien{} first lien $\to$ \nClosedEnd{} closed-end (excluding \nOpenEndExempt{} records whose open-end flag is exempt; see below) $\to$ \nNonBusiness{} non-business $\to$ \nNonReverse{} non-reverse $\to$ \nSiteBuilt{} site-built with 1--4 units $\to$ \nCore{} principal residence (Table~\ref{tab:waterfall}). We drop second homes and investment properties (\nNonPrincipal{} applications) because at that step they make up \occConv\% of conventional applications but at most \occGovMax\% of FHA, VA, and USDA applications; occupancy would otherwise confound the product comparison. The denial rate is $n_3/(n_1+n_2+n_3)$ over the \nDecisioned{} decisioned applications. Of these, \nUsable{} (\shareUsable\%) have valid DTI, CLTV, and income; we call them the \emph{usable} sample. The \nExcluded{} decisioned applications we leave out are denied at \drExcluded\%, compared with \baseRate\% in the usable sample, so risk-adjusted results describe complete applications only. Our proposal planned a check that adds back the records with an exempt open-end flag. It changes almost nothing: only \oeAddBusiness{} of the \nOpenEndExempt{} pass the next filter (business purpose), \oeAddCore{} reach the core sample and \oeAddUsable{} the usable sample, and none of the \oeNStats{} key results we tracked moves by more than $\oeMaxAbs\times10^{\oeMaxAbsExp}$ (Appendix~\ref{app:checks}, Table~\ref{tab:openend}). For pricing we use \nPricing{} originations with a valid rate spread and compare spreads only within a loan type, because FHA APRs include the upfront insurance premium. We use the rate spread rather than the interest rate because it is measured against the average prime offer rate on the day the rate was set, which removes market-rate movements during the year.
+
+\begin{table}[t]
+\caption{Sample construction: records left after each step, in the order applied, and records removed by the step. $^{a}$ Includes \nOpenEndExempt{} records whose open-end flag is exempt (\texttt{1111}).}\label{tab:waterfall}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{Lrr}
+\toprule
+Step & Records & Removed \\
+\midrule
+\tabin{tables/waterfall.tex}
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \textbf{Features.} The file reports DTI as single values for 36--49 and as ranges elsewhere; we map it to a 19-level ordinal and into six bands ($<$30, 30--35, 36--42, 43--49, 50--60, $>$60), without inventing midpoints for the ranges. CLTV gets five bands ($\le$80, 80--90, 90--95, 95--100, $>$100\%), and loan-to-income (loan amount$/(1000\times$income)) is split into tertiles. Crossing the three gives 90 fixed \emph{risk cells}. The smallest holds \minCellN{} usable applications, and every cell has at least \minFHAcell{} FHA applications. An application's expected denial probability is the national denial rate in its risk cell, crossed with loan type and purpose (\nExtCells{} cells; the \fallbackShare\% of applications in cells with fewer than 30 cases use the plain risk-cell rate instead). We compute these rates on the whole usable sample, so they include the applications of the lender or area being judged; the largest lender alone holds \topLenderShare\% of them. This pulls large units toward $O/E=1$, so measured dispersion is, if anything, too low. LMI tracts are those whose income is below 80\% of the area median. Appendix~\ref{app:rules} lists every coding rule.
 
@@ -364,7 +377,6 @@ Gradient boosting ranks applications better than logistic regression (ROC-AUC \a
 
 Across 4.1 million applications whose risk we can measure, observable risk explains most of the FHA--conventional denial gap on average but not its shape, explains almost none of the cash-out refinance gap, and reveals a sharp underwriting threshold at 50\% DTI. The lender, not the metropolitan area, is the main source of variation in risk-adjusted denial and pricing. Pandas and PySpark agree on every number we compared, and an independent SQL version and the FFIEC's own aggregates confirm them. Pandas hits our memory budget between \lastRows{} and \oomRows{} million rows; Spark pays off for grouped aggregations from about 3 million rows read from disk or 23 million in memory, while Pandas stayed faster on the iterative workload up to 46 million rows.
 
-\clearpage
 \setcounter{dbltopnumber}{4}
 \renewcommand{\dbltopfraction}{0.9}
 \renewcommand{\topfraction}{0.9}
@@ -396,31 +408,32 @@ Figures~\ref{fig:heatmap}--\ref{fig:perf} and Tables~\ref{tab:sens}--\ref{tab:pe
 
 Table~\ref{tab:datachecks} gives the further data checks of Sections~2 and~3, Table~\ref{tab:clean} describes the clean core table of Section~3, and Table~\ref{tab:openend} shows the open-end sensitivity run of Section~3, a full rerun of the Pandas notebook with the closed-end filter widened to keep exempt open-end flags. Table~\ref{tab:jump} gives the DTI jump test of Section~\ref{sec:sqtwo}, Table~\ref{tab:kitagawa} the values behind Figure~\ref{fig:kitagawa}, and Table~\ref{tab:dist} the summary statistics behind Figure~\ref{fig:products}b--d. Table~\ref{tab:cache} shows the cache diagnosis of Section~8, a rerun of W1 on the performance table with Spark's storage status read after each cache was built.
 
-\begin{table}[b]
+\begin{table*}[p]
+\begin{minipage}[t]{0.47\textwidth}
 \caption{Clean core table kept as a notebook output; rows per state and column types are in \texttt{results/clean/}.}\label{tab:clean}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\columnwidth}{Lr}
+\begin{tabularx}{\linewidth}{Lr}
 \toprule
 Item & Value \\
 \midrule
 \tabin{tables/clean.tex}
 \bottomrule
 \end{tabularx}
-\end{table}
-
-\begin{table}[b]
+\end{minipage}\hfill
+\begin{minipage}[t]{0.47\textwidth}
 \caption{Sensitivity to records whose open-end flag is exempt (gaps and jumps in percentage points).}\label{tab:openend}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\columnwidth}{Lrr}
+\begin{tabularx}{\linewidth}{Lrr}
 \toprule
 Quantity & Main & With exempt flags \\
 \midrule
 \tabin{tables/open_end.tex}
 \bottomrule
 \end{tabularx}
-\end{table}
+\end{minipage}
+\end{table*}
 
 \textbf{Cache diagnosis (Section~8).} Building the cache took \cbFull{} s at 100\% and \cbSixteen{} s at 16$\times$, and from 4$\times$ up the cached runs of all three workloads were slower than the uncached ones (Table~\ref{tab:perfdetail}). Memory is not the cause (Table~\ref{tab:cache}): at 16$\times$ the cache used \cdMemSixteen{} of \cdStorageMax{} GB of storage memory, with every partition cached and nothing on disk, and caching only W1's five columns did not help (\cdColsSixteen{} s against \cdNoCacheSixteen{} s from Parquet). The cost lies in scanning Spark's in-memory format; most likely the small Parquet file (\cdParquetSixteen{} GB at 16$\times$) stays in the operating system's file cache, so the uncached run hardly reads the disk either.
 
@@ -430,8 +443,8 @@ Quantity & Main & With exempt flags \\
 
 Four Kaggle notebooks implement the project, one each for the Pandas pipeline, the PySpark pipeline, the performance experiment, and the equivalence check, all run on 15 November 2026; the executed notebooks, with every cell output, are in the repository's \fd{notebooks} folder. Five more notebooks, run on 16 November 2026 and kept in \fd{notebooks/extra}, carry out the work of Sections~3, 4.1, 7, 8, and~9 and Appendix~\ref{app:checks}: the DuckDB implementation, the Data Browser slices, and the subgroup calibration; the open-end sensitivity run; the cache diagnosis; the export of the clean core table; and the distributions of Figure~\ref{fig:products}b--d. A sixth, run on 24 November 2026, adds the data checks of Table~\ref{tab:datachecks}; it also reruns the CSV-to-Parquet conversion (\convSec{} s, at most \convPeak{} GiB of memory), whose output matches the Parquet file used everywhere (same rows, columns, and size in bytes). The LAR CSV we used has SHA-256 \texttt{\larShaA}\allowbreak\texttt{\larShaB}. The notebooks' small outputs are in \fd{results/}, and the \nTests{} tests in \fd{tests/} run against those files. Inputs are the original FFIEC files imported by URL (LAR CSV and Transmittal Sheet), the Parquet file that a conversion notebook writes from that CSV, and the configuration (\fd{rules.yaml} 1.1 and \fd{expected.yaml}), so no notebook needs Internet access. Each notebook checks its counts against \fd{expected.yaml} and writes every table and key number to \fd{results/}; the tables, figures, and run-dependent numbers in this report are written from those files by a script rather than typed by hand; the few sizes quoted in running text (file sizes, row counts in millions) are rounded from the same files.
 
-% Appendix floats. Tables 8-9 ([b] above) sit at the foot of the columns of page 9; the rest fill
-% three float pages, grouped so that each page is filled.
+% Appendix floats: four float pages after the appendix text; LaTeX packs them in source order.
+% Tables are grouped in minipages so that each float page is filled.
 \begin{table*}[p]
 \caption{Variables and coding rules.}\label{tab:rules}
 \small
@@ -491,7 +504,6 @@ Field & \fd{NA} & \fd{Exempt} & Numeric & Other \\
 
 \end{minipage}
 \end{table*}
-\clearpage
 
 \begin{figure*}[p]
 \centering
@@ -562,7 +574,6 @@ A vs B & Gap & Comp. & Rate & A & B & A higher \\
 \end{tabular}
 \end{minipage}
 \end{table*}
-\clearpage
 
 \begin{table*}[p]
 \caption{Summary statistics of the financial variables, core sample; every value was computed in both Pandas and PySpark and agrees. Payment-to-income: monthly principal and interest over monthly income. Interest rates outside $[0, 20]$\% and terms outside $(0, 480]$ months are excluded, as in \texttt{rules.yaml}. The large SD of income comes from a few very high reported incomes (Table~\ref{tab:dq}).}\label{tab:dist}

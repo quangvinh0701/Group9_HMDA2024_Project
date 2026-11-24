@@ -71,7 +71,7 @@
 \renewcommand{\shortauthors}{Group 9}
 
 \begin{abstract}
-Using all \nAll{} records of the 2024 HMDA One-Year file, we study how mortgage denials and pricing differ across products, places, and lenders, and how much of each difference comes from observable risk. We built the analysis twice, in Pandas and in PySpark, from one rules file; the two versions agree on all \eqTotal{} values we compared (largest relative difference $\eqMaxDiff\times10^{\eqMaxExp}$), a third implementation in SQL with the rules written out by hand reproduces them, and the official HMDA Data Browser gives the same record counts and loan totals. Four findings stand out. FHA applicants are denied \kgFHAgap{} points more often than conventional applicants, but the share risk explains depends on whose risk mix we use: at the FHA mix FHA is denied less, at the conventional mix more. Cash-out refinances are denied \kgCOgap{} points more often than purchases, nearly all of it among applicants with the same measured risk. Denials jump at a debt-to-income ratio of 50\%, not at 43\%, by \jumpConvMain{} points for conventional loans. And lender effects on risk-adjusted denial vary about \twRatio{} times as much as metropolitan-area effects. In the performance experiment, Pandas hit our memory budget while loading a \oomRows{}-million-row table that Spark handled with \spMemOom{} GB. With data in memory, Spark was faster for a grouped aggregation from about 23 million rows; Pandas stayed faster on an iterative workload up to 46 million rows and tied at \lastRows{} million.
+Using all \nAll{} records of the 2024 HMDA One-Year file, we study how mortgage denials and pricing differ across products, places, and lenders, and how much of each difference comes from observable risk. We built the analysis twice, in Pandas and in PySpark, from one rules file; the two versions agree on all \eqTotal{} values we compared (largest relative difference $\eqMaxDiff\times10^{\eqMaxExp}$), a third implementation in SQL with the rules written out by hand reproduces them, and the official HMDA Data Browser gives the same record counts and loan totals. Four findings stand out. FHA applicants are denied \kgFHAgap{} points more often than conventional applicants, but the share risk explains depends on whose risk mix we use: at the FHA mix FHA is denied less, at the conventional mix more. Cash-out refinances are denied \kgCOgap{} points more often than purchases, nearly all of it among applicants with the same measured risk. Denials stay flat from a debt-to-income ratio of 30\% to 49\% and then jump at 50\%, by \jumpConvMain{} points for conventional loans. And lender effects on risk-adjusted denial vary about \twRatio{} times as much as metropolitan-area effects. In the performance experiment, Pandas hit our memory budget while loading a \oomRows{}-million-row table that Spark handled with \spMemOom{} GB. With data in memory, Spark was faster for a grouped aggregation from about 23 million rows; Pandas stayed faster on an iterative workload up to 46 million rows and tied at \lastRows{} million.
 \end{abstract}
 
 \keywords{HMDA, mortgage denial, rate spread, risk adjustment, Kitagawa decomposition, lender effects, Pandas, PySpark, scalability}
@@ -141,7 +141,7 @@ Table~\ref{tab:glance} summarizes the answers; the subsections give the evidence
 & Main finding \\
 \midrule
 SQ1 & FHA is denied more often than conventional (\drFHA\% against \drConv\%), but purpose matters more: \drPurchase\% of purchase and \drCashout\% of cash-out applications are denied. \\
-SQ2 & Risk mix explains \kgFHAcompShare\% of the FHA gap on average but not its shape; the cash-out gap lies almost entirely within risk cells (\kgCOrate{} of \kgCOgap{} points). Denial jumps at 50\% DTI (\jumpConvMain{} points for conventional loans), not at 43\%. \\
+SQ2 & Risk mix explains \kgFHAcompShare\% of the FHA gap on average but not its shape; the cash-out gap lies almost entirely within risk cells (\kgCOrate{} of \kgCOgap{} points). Denial is flat from 30\% to 49\% DTI and jumps at 50\% (\jumpConvMain{} points for conventional loans). \\
 SQ3 & Risk adjustment narrows state differences (SD \sdStateRaw{} $\to$ \sdStateStd{} points); the LMI gap (\kgLMIgap{} points) lies mostly within risk cells. \\
 SQ4 & Lenders vary about \twRatio{} times as much as MSAs (signal SD \twLenderSD{} against \twMSASD{} points; $\tau$ = \tauLender{} against \tauMSA). \\
 \bottomrule
@@ -177,16 +177,16 @@ Loan type & Applications & Originated & Withdrawn, incomplete & Decisioned & Den
 
 \subsection{Risk and the Composition of Gaps (SQ2)}\label{sec:sqtwo}
 
-\textbf{Denial and DTI (H2).} Figure~\ref{fig:dti} shows that denial stays flat, between \drDTImidMin\% and \drDTImidMax\%, at every DTI value from 30\% to 49\%. It then climbs to \drDTIfiftySixty\% at 50--60\% and \drDTIoverSixty\% above 60\%. To test for a jump, we compare the change between neighbouring DTI values with the average step inside 36--49 (Appendix Table~\ref{tab:jump}). For conventional loans, denial rises from \drConvFortynine\% at DTI 49 to \drConvFiftySixty\% at 50--60, an excess of \jumpConvMain{} points (95\% CI \jumpConvMainLo--\jumpConvMainHi). The step from 42 to 43 is only \jumpConvFortythree{} points, and the placebo cuts at 40 and 47 are not significant for conventional loans.
+\textbf{Denial and DTI (H2).} Figure~\ref{fig:dti} shows that denial stays flat, between \drDTImidMin\% and \drDTImidMax\%, at every DTI value from 30\% to 49\%. It then climbs to \drDTIfiftySixty\% at 50--60\% and \drDTIoverSixty\% above 60\%. To test for a jump, we compare the change between neighbouring DTI values with the average step inside 36--49 (Appendix Table~\ref{tab:jump}). For conventional loans, denial rises from \drConvFortynine\% at DTI 49 to \drConvFiftySixty\% at 50--60, an excess of \jumpConvMain{} points (95\% CI \jumpConvMainLo--\jumpConvMainHi). The placebo cuts at 40 and 47 are not significant for conventional loans.
 
-Two caveats apply. The 50--60 value is one bin covering eleven DTI values, so the main step compares a single value with a bin average; it is not a regression discontinuity estimate. And with samples this large, even tiny steps come out significant (for FHA, \jumpFHAFortythree{} points at 43 and \jumpFHAFortyfive{} at 45), so our conclusion rests on the size of the step, about 65 points against less than 1, and not on its p-value. Applications also bunch at exactly 49, with \bunchConv{} times the average count at 44--48. FHA and VA show only small jumps at 50 (\jumpFHAMain{} and \jumpVAMain{} points).
+Two caveats apply. The 50--60 value is one bin covering eleven DTI values, so the main step compares a single value with a bin average; it is not a regression discontinuity estimate. And with samples this large, even tiny steps come out significant (for FHA, \jumpFHAFortyfive{} points at 45), so our conclusion rests on the size of the step, about 65 points against less than 1, and not on its p-value. Applications also bunch at exactly 49, with \bunchConv{} times the average count at 44--48. FHA and VA show only small jumps at 50 (\jumpFHAMain{} and \jumpVAMain{} points).
 
-The limit that binds conventional loans in 2024 is thus 50\%, the cap in the GSEs' automated underwriting \citep{fanniemae_dti}, not the 43\% limit of the old Qualified Mortgage rule, which a price-based test replaced \citep{cfpb2020qm}. Applicants or loan officers seem to shape applications so that they land just under 50\%. Other readings exist: lenders report DTI after underwriting, so some bunching may come from recalculation rather than from borrowers. And applications above 50\% may be steered to FHA instead of being denied. The heatmap supports this: at DTI 50--60 and CLTV 95--100, where \fhaHighDTIcltvHundred\% of applications are FHA, denial is only \drHighDTIcltvHundred\% (Figure~\ref{fig:heatmap}, Appendix~\ref{app:supp}).
+The limit that binds conventional loans in 2024 is thus 50\%, the cap in the GSEs' automated underwriting \citep{fanniemae_dti}. Applicants or loan officers seem to shape applications so that they land just under 50\%. Other readings exist: lenders report DTI after underwriting, so some bunching may come from recalculation rather than from borrowers. And applications above 50\% may be steered to FHA instead of being denied. The heatmap supports this: at DTI 50--60 and CLTV 95--100, where \fhaHighDTIcltvHundred\% of applications are FHA, denial is only \drHighDTIcltvHundred\% (Figure~\ref{fig:heatmap}, Appendix~\ref{app:supp}).
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.96\textwidth]{figures/fig_dti.pdf}
-\caption{Denial rate by debt-to-income ratio, usable decisioned applications. (a) All 19 reported values; (b) single values 36--49 and the 50--60 bin by loan type (log scale). Dashed line: the cut between 49 and 50--60; dotted line in (b): the 43\% cut.}\label{fig:dti}
+\caption{Denial rate by debt-to-income ratio, usable decisioned applications. (a) All 19 reported values; (b) single values 36--49 and the 50--60 bin by loan type (log scale). Dashed line: the cut between 49 and 50--60.}\label{fig:dti}
 \end{figure*}
 
 \textbf{Low DTI is not low risk.} Applications with DTI below 20\% are denied at \drDTIlowTwenty\%, more than the \drDTItwentyThirty\% at 20--30\%. These applicants earn more (median income \$\lowDTIincome{}k against \$\midDTIincome{}k), have lower CLTV (median \lowDTIcltv\%), and more often refinance (\lowDTInonPurchase\% of their applications are not purchases, against \midDTInonPurchase\%), yet credit history is cited in \lowDTIcredit\% of their denials, against \midDTIcredit\% at 20--30\%. Low DTI therefore marks a different group of applicants rather than a safer one. CLTV shows the same U shape: denial is \drCLTVlow\% at CLTV $\le$80\%, where cash-out refinancing is concentrated (\convCashoutLeEighty\% of conventional cash-out originations), \drCLTVmid\% at 90--95\%, and \drCLTVhigh\% above 100\%.
@@ -348,7 +348,7 @@ Gradient boosting ranks applications better than logistic regression (ROC-AUC \a
 
 \textbf{Lenders and analysts.} Comparing raw denial rates across products is misleading. Most of the FHA gap is a matter of mix, but what is left changes sign across the risk distribution, and cash-out refinancing carries a large denial and price premium at the same measured ratios: the \psCOconvGap-point spread premium on the median conventional cash-out loan of \$\loanCOconv{},000 is about \$\dollarCOconv{} a year in interest.
 
-\textbf{Policymakers.} The old 43\% Qualified Mortgage limit leaves only a \jumpConvFortythree-point step in conventional denials in 2024, while the 50\% GSE cap leaves a \jumpConvMain-point step. The LMI gap sits mostly within risk cells, so credit-score data would be needed before drawing any conclusion about how applicants are treated.
+\textbf{Policymakers.} In 2024 conventional denials jump only at the 50\% GSE cap, by \jumpConvMain{} points; below it they stay flat. The LMI gap sits mostly within risk cells, so credit-score data would be needed before drawing any conclusion about how applicants are treated.
 
 \textbf{Limitations.}
 \begin{enumerate}[label=(\roman*),leftmargin=1.8em,itemsep=0pt,topsep=2pt,parsep=0pt]
@@ -362,7 +362,7 @@ Gradient boosting ranks applications better than logistic regression (ROC-AUC \a
 
 \section{Conclusion}
 
-Across 4.1 million applications whose risk we can measure, observable risk explains most of the FHA--conventional denial gap on average but not its shape, explains almost none of the cash-out refinance gap, and reveals a sharp underwriting threshold at 50\% DTI rather than 43\%. The lender, not the metropolitan area, is the main source of variation in risk-adjusted denial and pricing. Pandas and PySpark agree on every number we compared, and an independent SQL version and the FFIEC's own aggregates confirm them. Pandas hits our memory budget between \lastRows{} and \oomRows{} million rows; Spark pays off for grouped aggregations from about 3 million rows read from disk or 23 million in memory, while Pandas stayed faster on the iterative workload up to 46 million rows.
+Across 4.1 million applications whose risk we can measure, observable risk explains most of the FHA--conventional denial gap on average but not its shape, explains almost none of the cash-out refinance gap, and reveals a sharp underwriting threshold at 50\% DTI. The lender, not the metropolitan area, is the main source of variation in risk-adjusted denial and pricing. Pandas and PySpark agree on every number we compared, and an independent SQL version and the FFIEC's own aggregates confirm them. Pandas hits our memory budget between \lastRows{} and \oomRows{} million rows; Spark pays off for grouped aggregations from about 3 million rows read from disk or 23 million in memory, while Pandas stayed faster on the iterative workload up to 46 million rows.
 
 \clearpage
 \setcounter{dbltopnumber}{4}
@@ -524,11 +524,11 @@ Size & Load & W1 & W2 & W3 & Start & Build cache & W1 cached & W1 direct & W2 ca
 \caption{DTI jump test: change in denial rate between adjacent DTI values minus the mean step within 36--49 (percentage points). $^{*}$ 95\% confidence interval excludes zero. Bunching: applications at DTI 49 divided by the mean at 44--48.}\label{tab:jump}
 \footnotesize
 \setlength{\tabcolsep}{3.2pt}
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
-& Main & \multicolumn{2}{c}{Checks} & \multicolumn{2}{c}{Placebos} & \\
-\cmidrule(lr){2-2}\cmidrule(lr){3-4}\cmidrule(lr){5-6}
-Scope & 49$\to$50--60 & 42$\to$43 & 44$\to$45 & 39$\to$40 & 46$\to$47 & Bunching \\
+& Main & Check & \multicolumn{2}{c}{Placebos} & \\
+\cmidrule(lr){2-2}\cmidrule(lr){3-3}\cmidrule(lr){4-5}
+Scope & 49$\to$50--60 & 44$\to$45 & 39$\to$40 & 46$\to$47 & Bunching \\
 \midrule
 \tabin{tables/jump.tex}
 \bottomrule

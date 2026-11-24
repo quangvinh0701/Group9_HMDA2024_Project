@@ -187,7 +187,6 @@ mac("jumpConvMainLo", pct(jget("1", "49 -> 50-60", "ci_low")))
 mac("jumpConvMainHi", pct(jget("1", "49 -> 50-60", "ci_high")))
 mac("drConvFortynine", pct(jget("1", "49 -> 50-60", "rate_from")))
 mac("drConvFiftySixty", pct(jget("1", "49 -> 50-60", "rate_to")))
-mac("jumpConvFortythree", pp(jget("1", "42 -> 43", "excess"), 2))
 mac("jumpFHAMain", pp(jget("2", "49 -> 50-60", "excess")))
 mac("jumpVAMain", pp(jget("3", "49 -> 50-60", "excess")))
 mac("jumpAllMain", pp(jget("all", "49 -> 50-60", "excess")))
@@ -585,7 +584,7 @@ open(os.path.join(TAB, "kitagawa.tex"), "w").write("\n".join(lines) + "\n")
 lines = []
 for scope, lab_ in [("1", "Conventional"), ("2", "FHA"), ("3", "VA"), ("all", "All")]:
     cells = [lab_]
-    for jump in ["49 -> 50-60", "42 -> 43", "44 -> 45", "39 -> 40", "46 -> 47"]:
+    for jump in ["49 -> 50-60", "44 -> 45", "39 -> 40", "46 -> 47"]:
         e, lo, hi = jget(scope, jump, "excess"), jget(scope, jump, "ci_low"), jget(scope, jump, "ci_high")
         sig = "" if (lo <= 0 <= hi) else "$^{*}$"
         cells.append(f"{pp(e, 1 if jump.startswith('49') else 2)}{sig}")
@@ -680,7 +679,7 @@ mac("twVarRatio", fmt_int((_kn["twoway_lender_signal_sd"] / _kn["twoway_msa_sign
 mac("twLeTwoShare", fmt(100 * _kn["twoway_share_lenders_le2_msas"], 1))
 _jt = rd(os.path.join(P, "sq2_dti_jump_test.csv"))
 _jf = _jt[_jt["scope"].astype(str) == "2"].set_index("jump")["excess"]
-mac("jumpFHAFortythree", pp(_jf["42 -> 43"], 2)); mac("jumpFHAFortyfive", pp(_jf["44 -> 45"], 2))
+mac("jumpFHAFortyfive", pp(_jf["44 -> 45"], 2))
 
 # ---- checks added after the first submission review (16 Nov 2026)
 def sci(x):                 # mantissa and exponent for $m\times10^{e}$
@@ -961,7 +960,6 @@ a2.set_yticklabels(["5", "10", "20", "50", "80"])
 a2.set_ylabel("Denial rate (%, log scale)")
 a2.set_xlabel("Debt-to-income ratio (%)")
 a2.axvline(17.5, color="#999999", lw=0.6, ls="--")
-a2.axvline(10.5, color="#bbbbbb", lw=0.6, ls=":")
 a2.set_title("(b) DTI 36-49 and 50-60 by loan type")
 a2.legend(frameon=False, loc="upper left")
 fig.tight_layout(w_pad=1.2)

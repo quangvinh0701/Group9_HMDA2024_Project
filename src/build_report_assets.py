@@ -805,6 +805,45 @@ lines = [f"{lab} & {_f(oe_.loc[k, 'main'], kind)} & {_f(oe_.loc[k, 'sensitivity'
 lines.append(f"Spearman $\\rho$ of lender $O/E$ & & {MAC['oeSpearman']} \\\\")
 open(os.path.join(TAB, "open_end.tex"), "w").write("\n".join(lines) + "\n")
 
+# data checks notebook (input hash, conversion cost, duplicates in samples, DTI gaps by lender, plausibility)
+_dc = os.path.join(RES, "data_checks", "data_checks.json")
+if os.path.exists(_dc):
+    dc = json.load(open(_dc))
+    assert dc["records"] == int(MAC["nAll"].replace(",", "")) and dc["usable_rows"] == int(MAC["nUsable"].replace(",", ""))
+    assert dc["dup_all"] == kp["duplicates"] and dc["same_rows_and_columns_as_input"]
+    assert dc["convert_parquet_bytes"] == dc["input_parquet_bytes"] and dc["dec_dti_missing"] == int(MAC["nDTImiss"].replace(",", ""))
+    mac("larShaA", dc["lar_sha256"][:32]); mac("larShaB", dc["lar_sha256"][32:]); mac("larShaShort", dc["lar_sha256"][:16])
+    mac("convSec", fmt(dc["convert_seconds"], 0)); mac("convPeak", fmt(dc["convert_peak_rss_gib"], 1))
+    mac("convRatio", fmt(dc["csv_to_parquet_ratio"], 1)); mac("convGB", fmt(dc["convert_parquet_bytes"] / 1e9, 2))
+    mac("csvGB", fmt(dc["csv_bytes"] / 1e9, 2))
+    mac("dupPatterns", fmt_int(dc["dup_all_patterns"])); mac("dupCore", fmt_int(dc["dup_core"]))
+    mac("dupDec", fmt_int(dc["dup_decisioned"])); mac("dupUsable", fmt_int(dc["dup_usable"]))
+    mac("dupUsableShare", fmt(100 * dc["dup_usable"] / dc["usable_rows"], 2))
+    mac("nLeiAll", fmt_int(dc["lenders_all_file"])); mac("nLeiCore", fmt_int(dc["lenders_core"]))
+    mac("nLeiDec", fmt_int(dc["lenders_decisioned"]))
+    mac("dtiMissDec", fmt_int(dc["dec_dti_missing"])); mac("dtiMissExempt", fmt_int(dc["dec_dti_exempt"]))
+    mac("dtiMissNA", fmt_int(dc["dec_dti_na"]))
+    mac("dtiTopTenMiss", pct(dc["top10_share_of_missing"])); mac("dtiTopTenDec", pct(dc["top10_share_of_decisioned"]))
+    mac("dtiLeiHalf", fmt_int(dc["lenders_for_50pct_missing"])); mac("dtiLeiEighty", fmt_int(dc["lenders_for_80pct_missing"]))
+    mac("dtiLeiNinety", fmt_int(dc["lenders_ge90"])); mac("dtiNinetyMiss", pct(dc["share_missing_from_lenders_ge90"]))
+    mac("dtiNinetyDec", pct(dc["share_decisioned_from_lenders_ge90"]))
+    mac("dtiRestRate", pct(dc["missing_rate_at_lenders_lt90"]))
+    mac("amtGtFive", fmt_int(dc["amt_gt5m"])); mac("irLeZero", fmt_int(dc["ir_orig_le0"]))
+    mac("irGtFifteen", fmt_int(dc["ir_orig_gt15"])); mac("termGtMax", fmt_int(dc["term_gt480"]))
+    mac("termLeZero", fmt_int(dc["term_le0"]))
+    lines = [f"Input LAR CSV, SHA-256 (first 16 hex) & \\texttt{{{dc['lar_sha256'][:16]}}} \\\\",
+             f"CSV to Parquet: time, peak memory & {fmt(dc['convert_seconds'], 0)} s, {fmt(dc['convert_peak_rss_gib'], 1)} GiB \\\\",
+             f"Duplicate records: file / core / usable & {fmt_int(dc['dup_all'])} / {fmt_int(dc['dup_core'])} / {fmt_int(dc['dup_usable'])} \\\\",
+             f"Lenders (LEI): file / core / decisioned & {fmt_int(dc['lenders_all_file'])} / {fmt_int(dc['lenders_core'])} / {fmt_int(dc['lenders_decisioned'])} \\\\",
+             f"DTI missing, decisioned: NA / Exempt & {fmt_int(dc['dec_dti_na'])} / {fmt_int(dc['dec_dti_exempt'])} \\\\",
+             f"\\quad top 10 lenders: share of it / of decisions & {pct(dc['top10_share_of_missing'])}\\% / {pct(dc['top10_share_of_decisioned'])}\\% \\\\",
+             f"\\quad lenders holding 50\\% / 80\\% of it & {fmt_int(dc['lenders_for_50pct_missing'])} / {fmt_int(dc['lenders_for_80pct_missing'])} \\\\",
+             f"Loan amount above \\$5 million, core & {fmt_int(dc['amt_gt5m'])} \\\\",
+             f"Interest rate $\\leq$0 / $>$15\\%, originations & {fmt_int(dc['ir_orig_le0'])} / {fmt_int(dc['ir_orig_gt15'])} \\\\",
+             f"Loan term $>$480 months, core (none $\\leq$0) & {fmt_int(dc['term_gt480'])} \\\\"]
+    assert dc["term_le0"] == 0
+    open(os.path.join(TAB, "datachecks.tex"), "w").write("\n".join(lines) + "\n")
+
 # ---- state map (Figure 4a): extremes of the risk-standardized ratio
 ST_NAME = {"HI": "Hawaii", "FL": "Florida", "LA": "Louisiana", "ID": "Idaho", "UT": "Utah", "MN": "Minnesota",
            "WV": "West Virginia", "DC": "the District of Columbia", "MS": "Mississippi", "SD": "South Dakota"}

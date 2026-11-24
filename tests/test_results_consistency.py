@@ -126,3 +126,19 @@ def test_descriptive_distributions_agree_and_match_table2():
     for v, var in [("loan_amount", "loan_amount"), ("interest_rate", "interest_rate")]:
         tot = h[(h.variable == v) & (h.group != "all")]["n"].sum()
         assert tot == d.loc[(var, "all"), "n"]
+
+
+def test_data_checks_agree_with_main_run():
+    """Notebook HMDA_data_checks (24/11/2026) phải khớp các số của lần chạy chính và tự nhất quán."""
+    d = json.load(open(os.path.join(RES, "data_checks", "data_checks.json")))
+    f = P("eq_1_filter_counts").set_index("step")["rows"]
+    assert d["records"] == f["all_records"] and d["core_rows"] == f["principal_residence"]
+    assert d["decisioned_rows"] == f["decisioned"] and d["usable_rows"] == f["usable"]
+    assert d["dup_all"] == K["duplicates"]
+    assert d["dup_all"] >= d["dup_core"] >= d["dup_decisioned"] >= d["dup_usable"] >= 0
+    assert d["dec_dti_na"] + d["dec_dti_exempt"] + d["dec_dti_other"] == d["dec_dti_missing"]
+    assert d["convert_rows"] == d["records"] and d["convert_parquet_bytes"] == d["input_parquet_bytes"]
+    top = pd.read_csv(os.path.join(RES, "data_checks", "dti_missing_top25_lenders.csv"))
+    assert top["miss"].is_monotonic_decreasing
+    assert top["miss"].head(10).sum() / d["dec_dti_missing"] == pytest.approx(d["top10_share_of_missing"], rel=1e-12)
+    assert np.allclose(top["miss"] / top["n"], top["miss_rate"], rtol=1e-12)

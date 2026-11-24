@@ -6,7 +6,9 @@ Convert the HMDA 2024 LAR CSV to Parquet without loading the whole file into mem
   same rules file).
 - A row_id column (0-based position of the record in the CSV) is added so both
   pipelines and the benchmark can select identical records.
-- Memory use stays around a few hundred MB regardless of file size.
+- The CSV is read in 256 MB blocks and never held whole; on the Kaggle machine (4 CPUs, 31 GiB)
+  the 4.6 GB file took 164 s with a peak of 6.6 GiB resident memory
+  (measured in notebooks/extra/HMDA_data_checks).
 
 Usage:
     python convert_to_parquet.py 2024_lar.csv hmda_2024_raw.parquet

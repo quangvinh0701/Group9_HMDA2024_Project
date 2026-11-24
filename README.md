@@ -183,24 +183,24 @@ Both pipelines read every definition from `config/rules.yaml`, so they apply the
 | Report item | Result files (in `results/pandas/` unless another folder is given; the PySpark run writes the same names to `results/spark/`, see section 9) |
 |---|---|
 | Table 1, data quality | `dq_summary.csv`, `dq_special_codes.csv`, `dq_missing_by_action.csv`, `dq_field_profile.csv` |
-| Table 2, sample construction | `eq_1_filter_counts.csv` |
-| Table 3, the four sub-questions at a glance | the files of the rows below |
+| Table 13, sample construction | `eq_1_filter_counts.csv` |
+| Table 2, the four sub-questions at a glance | the files of the rows below |
 | Data Browser check (Section 2) | `results/external/data_browser_action_taken_2024.json`, `data_browser_slices_2024.csv`, `data_browser_comparison.csv` |
-| Table 4 and Figure 1a, products | `sq1_outcomes_by_type.csv`, `sq1_loan_amount_originated_by_type.csv`, `sq2_rate_spread_by_type.csv`, `sq1_denial_type_x_purpose.csv` |
+| Table 3 and Figure 1a, products | `sq1_outcomes_by_type.csv`, `sq1_loan_amount_originated_by_type.csv`, `sq2_rate_spread_by_type.csv`, `sq1_denial_type_x_purpose.csv` |
 | Figure 1b-d and Table 18, distributions | `results/descriptive/summary_stats.csv`, `histograms.csv`, `loan_by_income_band.csv`, `loan_income_correlation.csv`, `pandas_vs_spark.csv` |
 | Figure 2 and Table 15, DTI | `sq2_denial_by_dti_19.csv`, `sq2_dti_jump_table.csv`, `sq2_dti_jump_test.csv`, `sq2_dti_bunching.csv` |
 | Low-DTI check | `sq2_low_dti_profile.csv`, `sq2_low_dti_reasons.csv`, `sq2_low_dti_by_type_purpose.csv` |
 | Figure 3 and Table 17, decomposition; pricing | `sq2_kitagawa_denial.csv`, `sq3_lmi_kitagawa.csv`, `sq2_kitagawa_rate_spread.csv`, `sq2_risk_cells.csv` |
 | Geography | `sq3_state_oe.csv`, `sq3_msa_oe.csv`, `sq3_lmi_oe.csv`, `sq3_state_separate_lines.csv` |
 | Figure 4 (state map and funnel plots) and lender results | `sq4_lender_oe.csv`, `sq4_oe_by_agency.csv`, `sq4_two_way.csv`, `sq4_sensitivity.csv`, `sq4_spread_dispersion.csv`, `sq4_hhi_msa.csv` |
-| Tables 5 and 6, Pandas vs PySpark | `results/equivalence/equivalence_summary.csv`, `equivalence_details.csv` |
+| Tables 4 and 5, Pandas vs PySpark | `results/equivalence/equivalence_summary.csv`, `equivalence_details.csv` |
 | Table 20, the three checks | `results/equivalence/`, `results/independent/independent_vs_pandas_summary.csv`, `results/external/data_browser_comparison.csv` |
-| Table 7, Figure 9, Table 14, performance | `results/perf/perf_summary.csv`, `perf_memory.csv`, `perf_runs.csv` |
+| Table 6, Figure 9, Table 14, performance | `results/perf/perf_summary.csv`, `perf_memory.csv`, `perf_runs.csv` |
 | Table 19, cache diagnosis | `results/perf/perf_cache_diagnosis.csv` |
-| Table 8, Figure 8, prediction, and the subgroup calibration | `pred_metrics.csv`, `pred_lender_oe_comparison.csv`, `pred_calibration_deciles.csv`, `results/predictive/pred_subgroups.csv`; the MLlib version is in `results/spark/key_numbers.json` and `pred_mllib_vs_sklearn_by_purpose.csv` |
-| Table 10, open-end sensitivity | `results/sensitivity/open_end_exempt.csv`, `open_end_exempt_funnel.csv` |
+| Table 7, Figure 8, prediction, and the subgroup calibration | `pred_metrics.csv`, `pred_lender_oe_comparison.csv`, `pred_calibration_deciles.csv`, `results/predictive/pred_subgroups.csv`; the MLlib version is in `results/spark/key_numbers.json` and `pred_mllib_vs_sklearn_by_purpose.csv` |
+| Table 9, open-end sensitivity | `results/sensitivity/open_end_exempt.csv`, `open_end_exempt_funnel.csv` |
 | Table 16, further data checks (input SHA-256, conversion cost, duplicates by sample, missing DTI by lender, implausible values) | `results/data_checks/data_checks.json`, `dti_missing_top25_lenders.csv` |
-| Table 9, clean core table | `results/clean/clean_core_summary.json`, `clean_core_manifest.csv`, `clean_core_columns.csv`, `clean_core_pandas_vs_spark.csv` |
+| Table 8, clean core table | `results/clean/clean_core_summary.json`, `clean_core_manifest.csv`, `clean_core_columns.csv`, `clean_core_pandas_vs_spark.csv` |
 | Dollar amounts in Section 10 | `results/independent/ind_magnitudes.json` |
 | Single numbers quoted in the text | `key_numbers.json` |
 

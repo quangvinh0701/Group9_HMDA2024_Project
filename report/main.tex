@@ -45,28 +45,9 @@
 \begin{document}
 
 \title[Mortgage Credit Access and Pricing in 2024]{Mortgage Credit Access and Pricing in 2024: A Large-Scale HMDA Analysis Across Products, Regions, and Lenders}
-\subtitle{Big Data Analysis Final Project, Group 9\\Instructor: Huan Vu, Faculty of DS\&AI, National Economics University}
+\subtitle{Big Data Analysis Final Project\\Instructor: Huan Vu, Faculty of DS\&AI, National Economics University}
 
-\author{Bùi Quang Vinh}
-\affiliation{%
-  \department{Student ID 11230786}
-  \institution{National Economics University}
-  \city{Hanoi}
-  \country{Vietnam}}
-
-\author{Nguyễn Tiến Công}
-\affiliation{%
-  \department{Student ID 11230739}
-  \institution{National Economics University}
-  \city{Hanoi}
-  \country{Vietnam}}
-
-\author{Đinh Hồng Sơn}
-\affiliation{%
-  \department{Student ID 11230773}
-  \institution{National Economics University}
-  \city{Hanoi}
-  \country{Vietnam}}
+\author{\NoCaseChange{\normalfont\normalsize Group 9 \textbar{} 11230786 -- Bùi Quang Vinh \textbar{} 11230773 -- Đinh Hồng Sơn \textbar{} 11230739 -- Nguyễn Tiến Công}}
 
 \renewcommand{\shortauthors}{Group 9}
 
@@ -122,20 +103,7 @@ No state, decisioned (usable) & \nNoStateDec{} (\nNoState) & Reported separately
 
 \textbf{Storage.} A PyArrow script converts the CSV to Parquet, keeping every column as text (so no CSV reader can quietly turn \fd{NA} into a null) and adding a row identifier. On Kaggle the conversion takes \convSec{} s and at most \convPeak{} GiB of memory. Both pipelines start from this file and read the same versioned rules file (\fd{rules.yaml}, frozen at version 1.1), which fixes every filter, code mapping, band, and threshold. Each run also checks itself against verified counts in \fd{expected.yaml}. The prepared analytical table is the core sample (\nCore{} rows): the row identifier, nine raw fields kept as published (identifiers and codes), and typed derived fields (ratios, amounts, the DTI ordinal, and the outcome as doubles, sample flags as booleans, bands and labels as text). Spark writes this table as Parquet partitioned by \fd{state_code}. With 55 values, state is the key of the geographic summaries, so a state query reads only its own folder; county, with over 3,000 values, would produce many small files. Parquet reads only the columns a query needs, compresses well, and stores the schema. Pandas builds the same table in memory. A separate notebook keeps the Spark-written table as a downloadable output (\cleanRows{} rows, \cleanCols{} columns, \cleanParts{} state folders, \cleanMB{} MB) and compares it with the Pandas table row by row: all \cleanCmp{} shared columns agree on every row.
 
-\textbf{Samples.} The core sample keeps first-lien, closed-end, non-business, non-reverse applications for owner-occupied, site-built homes with 1--4 units: \nAll{} $\to$ \nApps{} applications $\to$ \nFirstLien{} first lien $\to$ \nClosedEnd{} closed-end (excluding \nOpenEndExempt{} records whose open-end flag is exempt; see below) $\to$ \nNonBusiness{} non-business $\to$ \nNonReverse{} non-reverse $\to$ \nSiteBuilt{} site-built with 1--4 units $\to$ \nCore{} principal residence (Table~\ref{tab:waterfall}). We drop second homes and investment properties (\nNonPrincipal{} applications) because at that step they make up \occConv\% of conventional applications but at most \occGovMax\% of FHA, VA, and USDA applications; occupancy would otherwise confound the product comparison. The denial rate is $n_3/(n_1+n_2+n_3)$ over the \nDecisioned{} decisioned applications. Of these, \nUsable{} (\shareUsable\%) have valid DTI, CLTV, and income; we call them the \emph{usable} sample. The \nExcluded{} decisioned applications we leave out are denied at \drExcluded\%, compared with \baseRate\% in the usable sample, so risk-adjusted results describe complete applications only. Our proposal planned a check that adds back the records with an exempt open-end flag. It changes almost nothing: only \oeAddBusiness{} of the \nOpenEndExempt{} pass the next filter (business purpose), \oeAddCore{} reach the core sample and \oeAddUsable{} the usable sample, and none of the \oeNStats{} key results we tracked moves by more than $\oeMaxAbs\times10^{\oeMaxAbsExp}$ (Appendix~\ref{app:checks}, Table~\ref{tab:openend}). For pricing we use \nPricing{} originations with a valid rate spread and compare spreads only within a loan type, because FHA APRs include the upfront insurance premium. We use the rate spread rather than the interest rate because it is measured against the average prime offer rate on the day the rate was set, which removes market-rate movements during the year.
-
-\begin{table}[t]
-\caption{Sample construction: records left after each step, in the order applied, and records removed by the step. $^{a}$ Includes \nOpenEndExempt{} records whose open-end flag is exempt (\texttt{1111}).}\label{tab:waterfall}
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\columnwidth}{Lrr}
-\toprule
-Step & Records & Removed \\
-\midrule
-\tabin{tables/waterfall.tex}
-\bottomrule
-\end{tabularx}
-\end{table}
+\textbf{Samples.} The core sample keeps first-lien, closed-end, non-business, non-reverse applications for owner-occupied, site-built homes with 1--4 units: \nAll{} $\to$ \nApps{} applications $\to$ \nFirstLien{} first lien $\to$ \nClosedEnd{} closed-end (excluding \nOpenEndExempt{} records whose open-end flag is exempt; see below) $\to$ \nNonBusiness{} non-business $\to$ \nNonReverse{} non-reverse $\to$ \nSiteBuilt{} site-built with 1--4 units $\to$ \nCore{} principal residence (Appendix Table~\ref{tab:waterfall}). We drop second homes and investment properties (\nNonPrincipal{} applications) because at that step they make up \occConv\% of conventional applications but at most \occGovMax\% of FHA, VA, and USDA applications; occupancy would otherwise confound the product comparison. The denial rate is $n_3/(n_1+n_2+n_3)$ over the \nDecisioned{} decisioned applications. Of these, \nUsable{} (\shareUsable\%) have valid DTI, CLTV, and income; we call them the \emph{usable} sample. The \nExcluded{} decisioned applications we leave out are denied at \drExcluded\%, compared with \baseRate\% in the usable sample, so risk-adjusted results describe complete applications only. Our proposal planned a check that adds back the records with an exempt open-end flag. It changes almost nothing: only \oeAddBusiness{} of the \nOpenEndExempt{} pass the next filter (business purpose), \oeAddCore{} reach the core sample and \oeAddUsable{} the usable sample, and none of the \oeNStats{} key results we tracked moves by more than $\oeMaxAbs\times10^{\oeMaxAbsExp}$ (Appendix~\ref{app:checks}, Table~\ref{tab:openend}). For pricing we use \nPricing{} originations with a valid rate spread and compare spreads only within a loan type, because FHA APRs include the upfront insurance premium. We use the rate spread rather than the interest rate because it is measured against the average prime offer rate on the day the rate was set, which removes market-rate movements during the year.
 
 \textbf{Features.} The file reports DTI as single values for 36--49 and as ranges elsewhere; we map it to a 19-level ordinal and into six bands ($<$30, 30--35, 36--42, 43--49, 50--60, $>$60), without inventing midpoints for the ranges. CLTV gets five bands ($\le$80, 80--90, 90--95, 95--100, $>$100\%), and loan-to-income (loan amount$/(1000\times$income)) is split into tertiles. Crossing the three gives 90 fixed \emph{risk cells}. The smallest holds \minCellN{} usable applications, and every cell has at least \minFHAcell{} FHA applications. An application's expected denial probability is the national denial rate in its risk cell, crossed with loan type and purpose (\nExtCells{} cells; the \fallbackShare\% of applications in cells with fewer than 30 cases use the plain risk-cell rate instead). We compute these rates on the whole usable sample, so they include the applications of the lender or area being judged; the largest lender alone holds \topLenderShare\% of them. This pulls large units toward $O/E=1$, so measured dispersion is, if anything, too low. LMI tracts are those whose income is below 80\% of the area median. Appendix~\ref{app:rules} lists every coding rule.
 
@@ -502,6 +470,18 @@ Field & \fd{NA} & \fd{Exempt} & Numeric & Other \\
 \multicolumn{5}{l}{$^{a}$ Values 1111, 8888, 9999: reported incomes, also in Numeric.}
 \end{tabular}
 
+
+\vspace{10pt}
+\caption{Sample construction: records left after each step, in the order applied, and records removed by the step. $^{a}$ Includes \nOpenEndExempt{} records whose open-end flag is exempt (\texttt{1111}).}\label{tab:waterfall}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\linewidth}{Lrr}
+\toprule
+Step & Records & Removed \\
+\midrule
+\tabin{tables/waterfall.tex}
+\bottomrule
+\end{tabularx}
 \end{minipage}
 \end{table*}
 
